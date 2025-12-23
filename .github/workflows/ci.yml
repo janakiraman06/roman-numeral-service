@@ -105,14 +105,17 @@ jobs:
         with:
           context: .
           push: false
+          load: true  # Load image into local Docker daemon for testing
           tags: roman-numeral-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Test Docker image
         run: |
+          docker images  # Verify image is loaded
           docker run -d --name test-container -p 8080:8080 -p 8081:8081 roman-numeral-service:latest
-          sleep 30
+          sleep 45  # Give more time for Spring Boot to start
+          docker logs test-container  # Show logs for debugging
           curl -f http://localhost:8080/romannumeral?query=42 || exit 1
           docker stop test-container
 
