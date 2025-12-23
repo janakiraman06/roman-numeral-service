@@ -1,0 +1,124 @@
+# ============================================
+# Roman Numeral Service - Docker Compose
+# ============================================
+# Full observability stack:
+# - Application (Spring Boot)
+# - Prometheus (Metrics collection)
+# - Loki (Log aggregation)
+# - Grafana (Visualization)
+# ============================================
+
+services:
+  # ==========================================
+  # Roman Numeral Service (Main Application)
+  # ==========================================
+  roman-numeral-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: roman-numeral-service
+    ports:
+      - "8080:8080"   # Application
+      - "8081:8081"   # Actuator/Management
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - observability
+    labels:
+      - "app=roman-numeral-service"
+
+  # ==========================================
+  # Prometheus (Metrics Collection)
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - observability
+    depends_on:
+      - roman-numeral-service
+
+  # ==========================================
+  # Loki (Log Aggregation)
+  # ==========================================
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - observability
+
+  # ==========================================
+  # Promtail (Log Shipping to Loki)
+  # ==========================================
+  promtail:
+    image: grafana/promtail:2.9.2
+    container_name: promtail
+    volumes:
+      - ./docker/loki/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - observability
+    depends_on:
+      - loki
+
+  # ==========================================
+  # Grafana (Visualization)
+  # ==========================================
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - observability
+    depends_on:
+      - prometheus
+      - loki
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  observability:
+    driver: bridge
+
+# ==========================================
+# Volumes
+# ==========================================
+volumes:
+  prometheus_data:
+  loki_data:
+  grafana_data:
+
