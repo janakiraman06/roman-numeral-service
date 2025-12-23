@@ -356,12 +356,25 @@ curl http://localhost:8081/actuator/health/readiness
 
 ### Grafana Dashboard
 
-Access Grafana at http://localhost:3000 (admin/admin) to view:
+**Direct Dashboard URL:** http://localhost:3000/d/roman-numeral-service
 
-- API response time percentiles (p50, p95, p99)
-- Request rate
-- Error rate
-- JVM heap memory
+Login: `admin` / `admin`
+
+The pre-configured production dashboard includes **15 panels** across 4 rows:
+
+| Row | Panels |
+|-----|--------|
+| **🔴 Critical Metrics (SLA)** | Availability SLA %, Response Time (p99), Error Rate (5xx), Request Rate |
+| **📊 Request Metrics** | Response Time Percentiles, Requests by Status Code, Status Distribution Pie, 4xx Rate, Total Requests |
+| **💻 JVM Metrics** | Heap Memory, CPU Usage, Thread Count, GC Pause Time, Non-Heap Memory |
+| **📋 Logs** | Live application logs from Loki |
+
+**Production-grade defaults:** Panels show "No traffic" instead of misleading values (like 0% error rate) when there are no requests to measure.
+
+**Debugging 5xx errors:**
+1. Check the **Error Rate (5xx)** panel for the rate
+2. Query Prometheus: `sum(increase(http_server_requests_seconds_count{status=~"5.."}[15m])) by (status, uri, exception)`
+3. Check **Application Logs** panel in Loki for stack traces
 
 ### Logging
 
