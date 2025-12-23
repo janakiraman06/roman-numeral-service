@@ -2,6 +2,7 @@ package com.adobe.romannumeral.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Global exception handler for the Roman Numeral API.
@@ -119,10 +121,25 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleNumberFormatException(NumberFormatException ex) {
         logger.warn("Number format error: {}", ex.getMessage());
         
-        return ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .contentType(MediaType.TEXT_PLAIN)
-            .body("Error: Invalid number format. Please provide a valid integer.");
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, 
+            "Invalid number format. Please provide a valid integer.");
+    }
+
+    /**
+     * Handles requests for non-existent resources (404).
+     * 
+     * <p>This prevents 500 errors when accessing undefined endpoints
+     * like /actuator/health on the wrong port.</p>
+     * 
+     * @param ex the NoResourceFoundException
+     * @return ResponseEntity with plain text error message and 404 status
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<String> handleNoResourceFound(NoResourceFoundException ex) {
+        logger.warn("Resource not found: {}", ex.getResourcePath());
+        
+        return buildErrorResponse(HttpStatus.NOT_FOUND, 
+            "Resource not found: " + ex.getResourcePath());
     }
 
     /**
@@ -131,17 +148,36 @@ public class GlobalExceptionHandler {
      * <p>This ensures that even unexpected errors return a proper response
      * rather than exposing stack traces or internal details.</p>
      * 
+     * <p>Includes correlation ID in response for easier issue reporting.</p>
+     * 
      * @param ex the Exception
      * @return ResponseEntity with generic error message and 500 status
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleGenericException(Exception ex) {
-        logger.error("Unexpected error occurred", ex);
+        String correlationId = MDC.get("correlationId");
+        logger.error("Unexpected error occurred [correlationId={}]", correlationId, ex);
         
+        String message = "An unexpected error occurred. Please try again later.";
+        if (correlationId != null) {
+            message += " (Reference: " + correlationId + ")";
+        }
+        
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, message);
+    }
+
+    /**
+     * Builds a standardized error response.
+     * 
+     * @param status  the HTTP status
+     * @param message the error message (without "Error: " prefix)
+     * @return ResponseEntity with formatted error
+     */
+    private ResponseEntity<String> buildErrorResponse(HttpStatus status, String message) {
         return ResponseEntity
-            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .status(status)
             .contentType(MediaType.TEXT_PLAIN)
-            .body("Error: An unexpected error occurred. Please try again later.");
+            .body("Error: " + message);
     }
 }
 

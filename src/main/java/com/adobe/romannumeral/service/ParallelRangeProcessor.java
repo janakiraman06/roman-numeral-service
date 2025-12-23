@@ -48,7 +48,16 @@ import java.util.stream.IntStream;
 public class ParallelRangeProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(ParallelRangeProcessor.class);
-
+    
+    /**
+     * Maximum allowed range size to prevent resource exhaustion.
+     * 
+     * <p>This protects against requests like ?min=1&max=3999 which would
+     * create 3999 concurrent tasks. Value chosen to balance usability
+     * and resource protection.</p>
+     */
+    private static final int MAX_RANGE_SIZE = 1000;
+    
     private final RomanNumeralConverter converter;
 
     /**
@@ -120,6 +129,7 @@ public class ParallelRangeProcessor {
      *   <li>min must be in valid range (1-3999)</li>
      *   <li>max must be in valid range (1-3999)</li>
      *   <li>min must be strictly less than max</li>
+     *   <li>Range size must not exceed maxRangeSize (resource protection)</li>
      * </ul>
      * 
      * @param min the minimum value
@@ -142,6 +152,13 @@ public class ParallelRangeProcessor {
         if (min >= max) {
             throw new IllegalArgumentException(
                 String.format("min (%d) must be less than max (%d)", min, max));
+        }
+        
+        int rangeSize = max - min + 1;
+        if (rangeSize > MAX_RANGE_SIZE) {
+            throw new IllegalArgumentException(
+                String.format("Range size (%d) exceeds maximum allowed (%d). " +
+                    "Please request a smaller range.", rangeSize, MAX_RANGE_SIZE));
         }
     }
 
