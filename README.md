@@ -336,6 +336,77 @@ docker-compose down
 
 ## Observability
 
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           OBSERVABILITY STACK                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────┐                                    │
+│  │     Roman Numeral Service           │                                    │
+│  │     (Spring Boot Application)       │                                    │
+│  │                                     │                                    │
+│  │  :8080 API ──────────────────────────────────────────► Users/Clients    │
+│  │                                     │                                    │
+│  │  :8081 Actuator ─────┬──────────────┼───────────────────────────────┐   │
+│  │                      │              │                               │   │
+│  │  stdout/stderr ──────┼──────────────┼─────────────────────────┐     │   │
+│  └──────────────────────┼──────────────┘                         │     │   │
+│                         │                                        │     │   │
+│         ┌───────────────┘                                        │     │   │
+│         │ /actuator/prometheus                                   │     │   │
+│         │ (metrics scrape)                                       │     │   │
+│         ▼                                                        ▼     │   │
+│  ┌─────────────────┐                                  ┌─────────────┐ │   │
+│  │   Prometheus    │                                  │  Promtail   │ │   │
+│  │   :9090         │                                  │  (agent)    │ │   │
+│  │                 │                                  │             │ │   │
+│  │  • Scrapes      │                                  │ • Reads     │ │   │
+│  │    metrics      │                                  │   Docker    │ │   │
+│  │  • Stores       │                                  │   logs      │ │   │
+│  │    time-series  │                                  │ • Pushes    │ │   │
+│  └────────┬────────┘                                  │   to Loki   │ │   │
+│           │                                           └──────┬──────┘ │   │
+│           │                                                  │        │   │
+│           │ PromQL queries                                   │ push   │   │
+│           │                                                  ▼        │   │
+│           │                                           ┌─────────────┐ │   │
+│           │                                           │    Loki     │ │   │
+│           │                                           │    :3100    │ │   │
+│           │                                           │             │ │   │
+│           │                                           │ • Indexes   │ │   │
+│           │                                           │   logs      │ │   │
+│           │                                           │ • Stores    │ │   │
+│           │                                           │   with      │ │   │
+│           │                                           │   labels    │ │   │
+│           │                                           └──────┬──────┘ │   │
+│           │                                                  │        │   │
+│           │                              LogQL queries       │        │   │
+│           │                                                  │        │   │
+│           └──────────────────┐      ┌────────────────────────┘        │   │
+│                              │      │                                 │   │
+│                              ▼      ▼                                 │   │
+│                        ┌─────────────────┐          /actuator/health  │   │
+│                        │    Grafana      │◄───────────────────────────┘   │
+│                        │    :3000        │                                │
+│                        │                 │                                │
+│                        │ • Dashboards    │                                │
+│                        │ • Alerts        │                                │
+│                        │ • Visualization │                                │
+│                        └─────────────────┘                                │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow Summary
+
+| Flow | Path | Port | Protocol |
+|------|------|------|----------|
+| **Metrics** | App → Prometheus → Grafana | 8081 → 9090 → 3000 | HTTP (pull) |
+| **Logs** | App → Docker → Promtail → Loki → Grafana | stdout → file → 3100 → 3000 | HTTP (push) |
+| **Health** | Grafana → App (Actuator) | 3000 → 8081 | HTTP (pull) |
+
 ### Metrics
 
 Available at `/actuator/prometheus` (port 8081):
