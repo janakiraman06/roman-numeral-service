@@ -87,13 +87,10 @@ app:
 # ============================================
 # Logging Configuration
 # ============================================
+# Note: Log levels are managed in logback-spring.xml based on Spring profile
+# - default profile: DEBUG for com.adobe.romannumeral
+# - prod profile: INFO for com.adobe.romannumeral
 logging:
-  level:
-    root: INFO
-    com.adobe.romannumeral: DEBUG
-    org.springframework.web: INFO
-    org.springframework.security: INFO
-  
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
 

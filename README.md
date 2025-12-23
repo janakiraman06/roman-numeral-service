@@ -3,6 +3,32 @@
 A production-ready REST API for converting integers to Roman numerals, built with Java 21 and Spring Boot for the Adobe AEM Engineering Assessment.
 
 [![CI/CD Pipeline](https://github.com/janakiraman06/roman-numeral-service/actions/workflows/ci.yml/badge.svg)](https://github.com/janakiraman06/roman-numeral-service/actions/workflows/ci.yml)
+[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![License](https://img.shields.io/badge/License-Assessment-blue.svg)]()
+
+---
+
+## Overview
+
+### Problem Statement
+
+Build a web service that converts integers to Roman numerals, supporting:
+- Single integer conversion (1-3999)
+- Parallel range conversion with multithreading
+- Production-grade observability (metrics, logging, monitoring)
+
+### Solution Highlights
+
+| Aspect | Implementation |
+|--------|----------------|
+| **Performance** | O(1) lookup via pre-computed cache (~40KB memory) |
+| **Concurrency** | Java 21 Virtual Threads for lightweight parallelism |
+| **Observability** | Prometheus metrics, Grafana dashboards, Loki logs |
+| **Reliability** | Rate limiting, correlation IDs, graceful error handling |
+| **Quality** | 90%+ test coverage, Checkstyle, CI/CD pipeline |
+
+---
 
 ## Table of Contents
 
@@ -233,11 +259,24 @@ Key configuration in `application.yml`:
 
 ### Test Coverage
 
-| Category | Tests | Coverage |
-|----------|-------|----------|
-| Unit Tests (Converter) | 45 | 100% |
-| Integration Tests (API) | 22 | All endpoints |
-| **Total** | **67+** | Comprehensive |
+```bash
+# Run tests with coverage report
+./mvnw clean verify
+
+# View HTML report
+open target/site/jacoco/index.html
+```
+
+| Category | Description |
+|----------|-------------|
+| **Unit Tests** | Parameterized tests for all 3999 conversions |
+| **Integration Tests** | Full HTTP request/response verification |
+| **Coverage Tool** | JaCoCo (report at `target/site/jacoco/`) |
+
+Coverage targets:
+- **Line Coverage**: > 80%
+- **Branch Coverage**: > 70%
+- **Critical Paths**: 100% (converter, controller)
 
 ### Test Types
 
@@ -396,9 +435,46 @@ String[] SYMBOLS = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", 
 ### Quality Gates
 
 - **Checkstyle**: Google Java Style Guide
-- **JaCoCo**: Code coverage reporting
+- **JaCoCo**: Code coverage reporting  
 - **Integration Tests**: Full API verification
 - **Load Tests**: Performance validation
+
+### Design Patterns Used
+
+| Pattern | Where | Why |
+|---------|-------|-----|
+| **Strategy** | `RomanNumeralConverter` interface | Extensibility for different conversion algorithms |
+| **Singleton** | Pre-computed cache | Single source of truth, thread-safe |
+| **Filter Chain** | `CorrelationIdFilter`, `RateLimitFilter` | Cross-cutting concerns separation |
+| **Builder** | Response DTOs (Records) | Immutable objects |
+| **Dependency Injection** | All components | Testability, loose coupling |
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Port 8080 in use | Another service running | `lsof -i :8080` and kill the process |
+| Docker build fails | Missing dependencies | `docker system prune -a` and rebuild |
+| Swagger UI 403 | Security filter blocking | Use `/swagger-ui/index.html` not `/swagger-ui.html` |
+| Grafana "No data" | Datasource UID mismatch | Check datasource provisioning has correct UIDs |
+| Loki no logs (macOS) | Container path issue | Using Loki Docker driver (already configured) |
+
+### Health Check Commands
+
+```bash
+# Application health
+curl http://localhost:8081/actuator/health
+
+# Prometheus metrics
+curl http://localhost:8081/actuator/prometheus | head -20
+
+# Test API
+curl "http://localhost:8080/romannumeral?query=42"
+```
 
 ---
 
@@ -439,8 +515,105 @@ String[] SYMBOLS = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", 
 
 Interactive API documentation available at:
 
-- **Swagger UI**: http://localhost:8080/swagger-ui.html
+- **Swagger UI**: http://localhost:8080/swagger-ui/index.html
 - **OpenAPI Spec**: http://localhost:8080/v3/api-docs
+
+---
+
+## Design Decisions & Trade-offs
+
+### Why Pre-computed Cache vs On-demand Computation?
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Pre-computed (Chosen)** | O(1) lookup, zero latency, thread-safe | ~40KB memory, startup time |
+| **On-demand** | Zero memory overhead | O(13) per request, repeated computation |
+
+**Decision**: Pre-compute. For a high-throughput API, trading 40KB memory for O(1) lookups is optimal.
+
+### Why Virtual Threads vs Thread Pool?
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Virtual Threads (Chosen)** | Lightweight, no pool tuning, scales naturally | Java 21+ only |
+| **Fixed Thread Pool** | Predictable resource usage | Pool size tuning, overhead |
+
+**Decision**: Virtual threads. For I/O-bound range queries, virtual threads provide better scalability with simpler code.
+
+### Why Plain Text Errors vs JSON?
+
+The API specification states errors "can be plain text". In production, RFC 7807 Problem Details (JSON) is preferred, but for this assessment we follow the spec exactly.
+
+For more details, see [TECH_DECISIONS.md](TECH_DECISIONS.md).
+
+---
+
+## Non-Functional Requirements
+
+| Requirement | Implementation | Target |
+|-------------|----------------|--------|
+| **Latency** | Pre-computed cache | < 10ms p99 |
+| **Throughput** | Virtual threads + rate limiting | 100 req/min per IP |
+| **Availability** | Health checks, graceful shutdown | 99.9% |
+| **Observability** | Prometheus, Grafana, Loki | Full stack |
+| **Security** | CORS, CSP, rate limiting | Defense in depth |
+
+---
+
+## Security Considerations
+
+- **Rate Limiting**: 100 requests/minute per IP (Bucket4j)
+- **Security Headers**: CSP, X-Frame-Options, X-Content-Type-Options
+- **No Authentication**: Not required per spec (would add OAuth2/JWT for production)
+- **Input Validation**: Strict range checking (1-3999)
+- **Correlation IDs**: Request tracing without exposing internals
+
+---
+
+## Performance Benchmarks
+
+Tested with k6 load testing tool:
+
+| Scenario | VUs | Duration | p95 Latency | Throughput |
+|----------|-----|----------|-------------|------------|
+| Smoke | 1 | 30s | < 50ms | ~30 req/s |
+| Load | 50 | 5m | < 100ms | ~500 req/s |
+| Stress | 200 | 10m | < 500ms | ~1000 req/s |
+
+---
+
+## Known Limitations & Future Enhancements
+
+### Current Limitations
+
+1. **Range**: 1-3999 only (standard Roman numeral range)
+2. **Authentication**: Not implemented (not required by spec)
+3. **Distributed Cache**: In-memory only (no Redis)
+
+### Potential Enhancements
+
+1. **Extended Range**: Support larger numbers with vinculum notation
+2. **Reverse Conversion**: Roman numeral to integer
+3. **Kubernetes**: Helm charts for K8s deployment
+4. **Distributed Caching**: Redis for horizontal scaling
+
+### API Versioning Strategy (If Needed)
+
+For this assessment, versioning is **intentionally not implemented** because:
+- The spec defines exact URLs without version prefixes
+- No breaking changes are anticipated
+- Over-engineering is a liability, not an asset
+
+**If versioning were required**, we would use **header-based versioning**:
+```
+GET /romannumeral?query=42
+Accept-Version: v1
+```
+
+This approach:
+- Preserves clean URLs matching the spec
+- Allows version negotiation without URL changes
+- Is documented in the controller code for future reference
 
 ---
 

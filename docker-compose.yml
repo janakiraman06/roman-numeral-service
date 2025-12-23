@@ -33,6 +33,17 @@ services:
       - observability
     labels:
       - "app=roman-numeral-service"
+    # Send logs directly to Loki
+    logging:
+      driver: loki
+      options:
+        loki-url: "http://localhost:3100/loki/api/v1/push"
+        loki-batch-size: "100"
+        loki-retries: "2"
+        loki-timeout: "2s"
+        labels: "app,container_name"
+    depends_on:
+      - loki
 
   # ==========================================
   # Prometheus (Metrics Collection)
