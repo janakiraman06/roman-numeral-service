@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Logback Configuration for Roman Numeral Service
+    
+    Supports two profiles:
+    - default: Console output with colored, human-readable format
+    - prod: JSON structured logging for log aggregation (Loki/ELK)
+-->
+<configuration scan="true" scanPeriod="30 seconds">
+
+    <!-- ===== Properties ===== -->
+    <property name="LOG_PATTERN" 
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId:-N/A}] %-5level %logger{36} - %msg%n"/>
+    
+    <property name="JSON_LOG_PATTERN" 
+              value='{"timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","thread":"%thread","correlationId":"%X{correlationId:-N/A}","logger":"%logger{36}","message":"%msg"}%n'/>
+
+    <!-- ===== Console Appender (Development) ===== -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ===== JSON Console Appender (Production) ===== -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${JSON_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ===== File Appender (Optional) ===== -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/roman-numeral-service.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/roman-numeral-service.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ===== Default Profile (Development) ===== -->
+    <springProfile name="default">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        
+        <logger name="com.adobe.romannumeral" level="DEBUG"/>
+        <logger name="org.springframework.web" level="INFO"/>
+    </springProfile>
+
+    <!-- ===== Production Profile ===== -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
+        </root>
+        
+        <logger name="com.adobe.romannumeral" level="INFO"/>
+        <logger name="org.springframework.web" level="WARN"/>
+        <logger name="org.springframework.security" level="WARN"/>
+    </springProfile>
+
+</configuration>
+
