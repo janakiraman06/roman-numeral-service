@@ -4,14 +4,14 @@ This directory contains load testing scripts using [k6](https://k6.io/).
 
 ## Prerequisites
 
-Install k6:
+Install k6 (choose one):
 
 ```bash
-# macOS
+# Option 1: Install locally on macOS (recommended)
 brew install k6
 
-# Docker
-docker run --rm -i grafana/k6 run - <script.js
+# Option 2: Use Docker (no installation needed)
+# See "Running with Docker" section below
 ```
 
 ## Test Scripts
@@ -58,6 +58,24 @@ k6 run spike-test.js
 ```bash
 k6 run -e BASE_URL=http://myserver:8080 load-test.js
 ```
+
+### Running with Docker (no k6 installation required):
+
+```bash
+# From project root directory
+cd /path/to/roman-numeral-service
+
+# Smoke test
+docker run --rm -v $(pwd)/load-tests/scripts:/scripts --network="host" grafana/k6 run /scripts/smoke-test.js
+
+# Load test
+docker run --rm -v $(pwd)/load-tests/scripts:/scripts --network="host" grafana/k6 run /scripts/load-test.js
+
+# Stress test
+docker run --rm -v $(pwd)/load-tests/scripts:/scripts --network="host" grafana/k6 run /scripts/stress-test.js
+```
+
+> **Note**: `--network="host"` allows k6 in Docker to access localhost:8080
 
 ## Success Criteria
 

@@ -38,6 +38,7 @@ Build a web service that converts integers to Roman numerals, supporting:
 - [Architecture](#architecture)
 - [Build and Run](#build-and-run)
 - [Testing](#testing)
+- [Performance Benchmarks](PERFORMANCE.md)
 - [Docker](#docker)
 - [Observability](#observability)
 - [Project Structure](#project-structure)
@@ -292,6 +293,21 @@ See [load-tests/README.md](load-tests/README.md) for k6 load testing instruction
 cd load-tests/scripts
 k6 run smoke-test.js
 ```
+
+### Performance Benchmarks
+
+For detailed performance metrics and benchmark results, see **[PERFORMANCE.md](PERFORMANCE.md)**.
+
+**Key Results Summary:**
+
+| Test | Throughput | p95 Response | Error Rate |
+|------|------------|--------------|------------|
+| Smoke (1 VU) | 2 req/s | 8.32ms | 0% |
+| Load (50 VUs) | 171 req/s | 7.04ms | 0% |
+| Stress (200 VUs) | 2,411 req/s | 6.80ms | 0%* |
+| Spike (100 VUs) | 400 req/s | 6.73ms | 0% |
+
+*\*Errors from rate limiting only, not application failures*
 
 ---
 

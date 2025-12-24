@@ -82,7 +82,7 @@ app:
   
   rate-limiting:
     enabled: true
-    requests-per-minute: 100
+    requests-per-minute: 100  # Production value - adjust for load testing
 
 # ============================================
 # Logging Configuration
