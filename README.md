@@ -43,6 +43,7 @@ Build a web service that converts integers to Roman numerals, supporting:
 - [Observability](#observability)
 - [Project Structure](#project-structure)
 - [Engineering Methodology](#engineering-methodology)
+- [Architecture Decision Records](#architecture-decision-records)
 - [Dependencies](#dependencies)
 
 ---
@@ -503,6 +504,8 @@ roman-numeral-service/
 │   │       ├── application.yml                  # Configuration
 │   │       └── logback-spring.xml               # Logging config
 │   └── test/                                    # Test classes
+├── docs/                                        # Documentation
+│   └── adr/                                     # Architecture Decision Records
 ├── docker/                                      # Docker configs
 │   ├── prometheus/
 │   ├── loki/
@@ -559,6 +562,21 @@ String[] SYMBOLS = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", 
 | **Filter Chain** | `CorrelationIdFilter`, `RateLimitFilter` | Cross-cutting concerns separation |
 | **Builder** | Response DTOs (Records) | Immutable objects |
 | **Dependency Injection** | All components | Testability, loose coupling |
+
+---
+
+## Architecture Decision Records
+
+All significant architectural decisions are documented as ADRs in [`docs/adr/`](docs/adr/).
+
+| ADR | Decision | Rationale |
+|-----|----------|-----------|
+| [ADR-001](docs/adr/001-precomputed-cache.md) | Pre-computed Cache | O(1) lookup, thread-safe, ~40KB memory |
+| [ADR-002](docs/adr/002-virtual-threads.md) | Java 21 Virtual Threads | Lightweight parallelism, no pool tuning |
+| [ADR-003](docs/adr/003-plain-text-errors.md) | Plain Text Errors | Specification compliance, simplicity |
+| [ADR-004](docs/adr/004-rate-limiting.md) | Bucket4j Rate Limiting | No external deps, token bucket algorithm |
+| [ADR-005](docs/adr/005-observability-stack.md) | PLG Stack | Industry standard, lightweight, unified |
+| [ADR-006](docs/adr/006-no-database.md) | No Database | YAGNI, stateless design, simplicity |
 
 ---
 
