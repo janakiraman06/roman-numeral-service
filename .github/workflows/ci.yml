@@ -75,8 +75,34 @@ jobs:
         run: ./mvnw checkstyle:check -B
         continue-on-error: true
 
-      - name: Generate JaCoCo Coverage Report
-        run: ./mvnw jacoco:report -B
+      - name: Run Tests with Coverage
+        run: ./mvnw clean verify -B
+        # This runs JaCoCo check which fails if coverage < 75% line, 65% branch
+
+      - name: Check Coverage Thresholds
+        run: |
+          echo "=== Coverage Check ==="
+          echo "Thresholds: Line >= 75%, Branch >= 65%"
+          # Extract coverage from JaCoCo CSV
+          if [ -f target/site/jacoco/jacoco.csv ]; then
+            awk -F',' 'NR>1 {
+              inst_missed+=$4; inst_cov+=$5;
+              branch_missed+=$6; branch_cov+=$7;
+              line_missed+=$8; line_cov+=$9;
+            }
+            END {
+              line_pct = (line_cov*100)/(line_missed+line_cov);
+              branch_pct = (branch_cov*100)/(branch_missed+branch_cov);
+              printf "Line Coverage: %.1f%%\n", line_pct;
+              printf "Branch Coverage: %.1f%%\n", branch_pct;
+              if (line_pct < 75) { print "FAIL: Line coverage below 75%"; exit 1; }
+              if (branch_pct < 65) { print "FAIL: Branch coverage below 65%"; exit 1; }
+              print "PASS: Coverage thresholds met";
+            }' target/site/jacoco/jacoco.csv
+          else
+            echo "JaCoCo report not found"
+            exit 1
+          fi
 
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4

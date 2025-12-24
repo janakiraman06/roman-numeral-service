@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 /**
  * Integration tests for the Roman Numeral API.
@@ -256,6 +257,176 @@ class RomanNumeralIntegrationTest {
                     .param("query", "invalid"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.TEXT_PLAIN));
+        }
+    }
+
+    @Nested
+    @DisplayName("Exception Handler Coverage")
+    class ExceptionHandlerTests {
+
+        @Test
+        @DisplayName("NumberFormatException for decimal returns 400")
+        void shouldReturn400ForDecimalNumber() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("query", "3.14"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.TEXT_PLAIN))
+                .andExpect(content().string(containsString("Invalid value")));
+        }
+
+        @Test
+        @DisplayName("Very large number returns 400")
+        void shouldReturn400ForVeryLargeNumber() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("query", "999999999"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.TEXT_PLAIN));
+        }
+
+        @Test
+        @DisplayName("Empty query parameter returns 400")
+        void shouldReturn400ForEmptyQuery() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("query", ""))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.TEXT_PLAIN));
+        }
+
+        @Test
+        @DisplayName("Non-existent romannumeral path returns 404")
+        void shouldReturn404ForNonExistentEndpoint() throws Exception {
+            // Test with a path under /romannumeral which is permitted by security
+            mockMvc.perform(get("/romannumeral/nonexistent"))
+                .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Invalid min parameter type returns 400")
+        void shouldReturn400ForInvalidMinType() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "abc")
+                    .param("max", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.TEXT_PLAIN))
+                .andExpect(content().string(containsString("Invalid value")));
+        }
+
+        @Test
+        @DisplayName("Invalid max parameter type returns 400")
+        void shouldReturn400ForInvalidMaxType() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "1")
+                    .param("max", "xyz"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.TEXT_PLAIN))
+                .andExpect(content().string(containsString("Invalid value")));
+        }
+
+        @Test
+        @DisplayName("Min out of range (below 1) returns 400")
+        void shouldReturn400ForMinBelowRange() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "0")
+                    .param("max", "10"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.TEXT_PLAIN))
+                .andExpect(content().string(containsString("between 1 and 3999")));
+        }
+
+        @Test
+        @DisplayName("Max out of range (above 3999) returns 400")
+        void shouldReturn400ForMaxAboveRange() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "1")
+                    .param("max", "5000"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.TEXT_PLAIN))
+                .andExpect(content().string(containsString("between 1 and 3999")));
+        }
+    }
+
+    @Nested
+    @DisplayName("Parallel Range Processing")
+    class ParallelProcessingTests {
+
+        @Test
+        @DisplayName("Large range (1-100) is processed correctly")
+        void shouldProcessLargeRange() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "1")
+                    .param("max", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conversions", hasSize(100)))
+                .andExpect(jsonPath("$.conversions[0].input").value("1"))
+                .andExpect(jsonPath("$.conversions[99].input").value("100"))
+                .andExpect(jsonPath("$.conversions[99].output").value("C"));
+        }
+
+        @Test
+        @DisplayName("Range near boundary (3990-3999) works correctly")
+        void shouldProcessRangeNearBoundary() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "3990")
+                    .param("max", "3999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conversions", hasSize(10)))
+                .andExpect(jsonPath("$.conversions[9].input").value("3999"))
+                .andExpect(jsonPath("$.conversions[9].output").value("MMMCMXCIX"));
+        }
+
+        @Test
+        @DisplayName("Range exceeding max size returns 400")
+        void shouldReturn400ForRangeExceedingMaxSize() throws Exception {
+            // MAX_RANGE_SIZE is 1000, so 1-1002 should fail
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "1")
+                    .param("max", "1002"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.TEXT_PLAIN))
+                .andExpect(content().string(containsString("exceeds maximum")));
+        }
+
+        @Test
+        @DisplayName("Maximum allowed range (1000 items) succeeds")
+        void shouldProcessMaxAllowedRange() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "1")
+                    .param("max", "1000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conversions", hasSize(1000)));
+        }
+    }
+
+    @Nested
+    @DisplayName("Correlation ID and Headers")
+    class HeaderTests {
+
+        @Test
+        @DisplayName("Response includes X-Correlation-ID header")
+        void shouldIncludeCorrelationIdHeader() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("query", "42"))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Correlation-ID"));
+        }
+
+        @Test
+        @DisplayName("Custom X-Correlation-ID is echoed back")
+        void shouldEchoCustomCorrelationId() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("query", "42")
+                    .header("X-Correlation-ID", "test-correlation-123"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Correlation-ID", "test-correlation-123"));
+        }
+
+        @Test
+        @DisplayName("Error response includes correlation ID")
+        void errorResponseShouldIncludeCorrelationId() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("query", "invalid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().exists("X-Correlation-ID"));
         }
     }
 }
