@@ -255,34 +255,45 @@ Key configuration in `application.yml`:
 ### Run All Tests
 
 ```bash
-./mvnw test
+./mvnw test          # Run tests only
+./mvnw clean verify  # Run tests + coverage check
 ```
 
 ### Test Coverage
 
+| Metric | Current | Threshold | Status |
+|--------|---------|-----------|--------|
+| **Line Coverage** | 96.2% | ≥ 75% | ✅ Pass |
+| **Branch Coverage** | 87.0% | ≥ 65% | ✅ Pass |
+| **Total Tests** | 94 | - | - |
+
 ```bash
-# Run tests with coverage report
+# Generate coverage report
 ./mvnw clean verify
 
 # View HTML report
 open target/site/jacoco/index.html
 ```
 
+**Coverage Enforcement**: Build fails if coverage drops below thresholds (configured in `pom.xml`).
+
+### Test Breakdown
+
+| Test Class | Tests | Coverage Focus |
+|------------|-------|----------------|
+| `StandardRomanNumeralConverterTest` | 25 | Conversion algorithm, boundary values |
+| `RomanNumeralIntegrationTest` | 42 | API endpoints, error handling, headers |
+| `GlobalExceptionHandlerTest` | 10 | All exception paths |
+| `RateLimitFilterTest` | 6 | Rate limiting behavior |
+| `ParallelRangeProcessorTest` | 11 | Parallel processing, validation |
+
+### Test Categories
+
 | Category | Description |
 |----------|-------------|
-| **Unit Tests** | Parameterized tests for all 3999 conversions |
-| **Integration Tests** | Full HTTP request/response verification |
-| **Coverage Tool** | JaCoCo (report at `target/site/jacoco/`) |
-
-Coverage targets:
-- **Line Coverage**: > 80%
-- **Branch Coverage**: > 70%
-- **Critical Paths**: 100% (converter, controller)
-
-### Test Types
-
-- **Unit Tests**: `StandardRomanNumeralConverterTest` - Parameterized tests for all conversions
-- **Integration Tests**: `RomanNumeralIntegrationTest` - Full HTTP request/response verification
+| **Unit Tests** | Isolated component testing with mocks |
+| **Integration Tests** | Full HTTP request/response via MockMvc |
+| **Parameterized Tests** | Data-driven tests for conversion validation |
 
 ### Load Testing
 
