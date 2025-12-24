@@ -116,3 +116,8 @@ coverage/
 # -----------------
 node_modules/
 
+# -----------------
+# Personal Study Files (not for commit)
+# -----------------
+docs/ALGORITHM_STUDY.md
+
