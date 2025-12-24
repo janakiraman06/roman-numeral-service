@@ -26,7 +26,7 @@ Build a web service that converts integers to Roman numerals, supporting:
 | **Concurrency** | Java 21 Virtual Threads for lightweight parallelism |
 | **Observability** | Prometheus metrics, Grafana dashboards, Loki logs |
 | **Reliability** | Rate limiting, correlation IDs, graceful error handling |
-| **Quality** | 90%+ test coverage, Checkstyle, CI/CD pipeline |
+| **Quality** | 96%+ test coverage, Checkstyle, SpotBugs, CI/CD pipeline |
 
 ---
 
@@ -591,6 +591,8 @@ curl "http://localhost:8080/romannumeral?query=42"
 
 ## Dependencies
 
+> **Note**: All dependencies listed below are publicly available open-source technologies. No proprietary or custom libraries are used.
+
 ### Runtime Dependencies
 
 | Dependency | Version | Purpose |
@@ -607,18 +609,23 @@ curl "http://localhost:8080/romannumeral?query=42"
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| Spring Boot Starter Test | 3.4.1 | Testing framework |
-| JUnit 5 | 5.10.x | Unit testing |
-| MockMvc | - | Integration testing |
+| Spring Boot Starter Test | 3.4.1 | Testing framework (JUnit 5, Mockito, AssertJ) |
+| Spring Security Test | 3.4.1 | Security testing utilities |
+| JUnit 5 | 5.10.x | Unit testing framework |
+| Mockito | 5.x | Mocking framework |
+| MockMvc | - | HTTP integration testing |
 
 ### Build Plugins
 
-| Plugin | Purpose |
-|--------|---------|
-| Spring Boot Maven Plugin | Executable JAR packaging |
-| Maven Compiler Plugin | Java 21 compilation |
-| JaCoCo Maven Plugin | Code coverage |
-| Checkstyle Maven Plugin | Code style enforcement |
+| Plugin | Version | Purpose |
+|--------|---------|---------|
+| Spring Boot Maven Plugin | 3.4.1 | Executable JAR packaging |
+| Maven Compiler Plugin | 3.13.0 | Java 21 compilation |
+| Maven Surefire Plugin | 3.2.5 | Test execution |
+| JaCoCo Maven Plugin | 0.8.12 | Code coverage reporting & enforcement |
+| Checkstyle Maven Plugin | 3.4.0 | Google Java Style enforcement |
+| SpotBugs Maven Plugin | 4.8.6.2 | Static bug analysis |
+| OWASP Dependency-Check | 9.2.0 | Security vulnerability scanning |
 
 ---
 
