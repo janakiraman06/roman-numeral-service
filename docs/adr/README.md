@@ -40,10 +40,11 @@ What becomes easier or more difficult because of this decision?
 | [ADR-003](003-plain-text-errors.md) | Use Plain Text Error Responses | Accepted | 2024-12-24 |
 | [ADR-004](004-rate-limiting.md) | Use Bucket4j for Rate Limiting | Accepted | 2024-12-24 |
 | [ADR-005](005-observability-stack.md) | Use Prometheus, Grafana, and Loki for Observability | Accepted | 2024-12-24 |
-| [ADR-006](006-no-database.md) | No Database Required | Accepted | 2024-12-24 |
+| [ADR-006](006-no-database.md) | No Database Required | Superseded | 2024-12-24 |
 | [ADR-007](007-array-cache-optimization.md) | Array Cache Optimization (HashMap to Array) | Accepted | 2025-12-25 |
 | [ADR-008](008-hybrid-threading-strategy.md) | Hybrid Threading Strategy (Virtual Threads + Parallel Streams) | Accepted | 2025-12-25 |
 | [ADR-009](009-pagination.md) | Offset-Based Pagination for Range Queries | Accepted | 2025-12-25 |
+| [ADR-010](010-api-key-authentication.md) | API Key Authentication | Accepted | 2025-12-25 |
 
 ## How to Add a New ADR
 
