@@ -1,12 +1,18 @@
 # ============================================
 # Roman Numeral Service - Docker Compose
 # ============================================
-# Full stack:
-# - Application (Spring Boot)
+# Full observability stack - NO PLUGINS REQUIRED
+# Just run: docker-compose up -d
+#
+# Components:
+# - Application (Spring Boot + Java 21)
 # - PostgreSQL (Database)
 # - Prometheus (Metrics collection)
-# - Loki (Log aggregation)
+# - Loki + Promtail (Log aggregation via file scraping)
 # - Grafana (Visualization)
+#
+# Note: Uses json-file logging driver (default) instead of
+# Loki plugin. Promtail scrapes logs from Docker log files.
 # ============================================
 
 services:
@@ -61,15 +67,16 @@ services:
       - observability
     labels:
       - "app=roman-numeral-service"
-    # Send logs directly to Loki
+      - "logging=promtail"
+    # Use json-file logging driver (default)
+    # Promtail scrapes logs from Docker's json-file logs
+    # No plugin installation required - works out of the box
     logging:
-      driver: loki
+      driver: json-file
       options:
-        loki-url: "http://localhost:3100/loki/api/v1/push"
-        loki-batch-size: "100"
-        loki-retries: "2"
-        loki-timeout: "2s"
-        labels: "app,container_name"
+        max-size: "10m"
+        max-file: "3"
+        labels: "app,logging"
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,12 +123,15 @@ services:
   # ==========================================
   # Promtail (Log Shipping to Loki)
   # ==========================================
+  # Scrapes logs from Docker's json-file logging driver
+  # No Docker plugin required - works out of the box
   promtail:
     image: grafana/promtail:2.9.2
     container_name: promtail
     volumes:
       - ./docker/loki/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/config.yml
     networks:
       - observability

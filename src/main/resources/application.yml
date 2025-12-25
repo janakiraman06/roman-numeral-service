@@ -17,24 +17,30 @@ spring:
     virtual:
       enabled: true
 
-  # Database Configuration (defaults for dev, overridden in prod)
+  # Database Configuration
+  # Uses environment variables with fallback to localhost for local dev
+  # In Docker Compose: SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/romannumeral
   datasource:
-    url: jdbc:postgresql://localhost:5432/romannumeral
-    username: romannumeral
-    password: romannumeral_secret
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/romannumeral}
+    username: ${SPRING_DATASOURCE_USERNAME:romannumeral}
+    password: ${SPRING_DATASOURCE_PASSWORD:romannumeral_secret}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
       idle-timeout: 30000
-      connection-timeout: 20000
+      connection-timeout: 30000
       max-lifetime: 1800000
+      # Allow startup to proceed even if DB is temporarily unavailable
+      initialization-fail-timeout: -1
 
   # JPA / Hibernate Configuration
   jpa:
     hibernate:
-      ddl-auto: update  # Auto-create/update schema (use 'validate' in prod with migrations)
+      ddl-auto: update  # Auto-create/update schema
     show-sql: false
+    # Defer datasource initialization to allow container startup ordering
+    defer-datasource-initialization: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

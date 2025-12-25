@@ -21,12 +21,17 @@ app:
 spring:
   jpa:
     hibernate:
-      ddl-auto: validate  # Never auto-modify schema in production
+      ddl-auto: update  # Auto-create tables if not exist (use Flyway for real prod)
     show-sql: false
+    # Defer datasource initialization until after Hibernate
+    defer-datasource-initialization: true
   datasource:
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
+      # Retry connection on startup (for container orchestration)
+      initialization-fail-timeout: 30000
+      connection-timeout: 30000
 
 # Minimal logging for performance
 logging:
