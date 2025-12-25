@@ -45,6 +45,7 @@ What becomes easier or more difficult because of this decision?
 | [ADR-008](008-hybrid-threading-strategy.md) | Hybrid Threading Strategy (Virtual Threads + Parallel Streams) | Accepted | 2025-12-25 |
 | [ADR-009](009-pagination.md) | Offset-Based Pagination for Range Queries | Accepted | 2025-12-25 |
 | [ADR-010](010-api-key-authentication.md) | API Key Authentication | Accepted | 2025-12-25 |
+| [ADR-011](011-event-driven-architecture.md) | Event-Driven Architecture with Apache Kafka | Accepted | 2025-12-25 |
 
 ## How to Add a New ADR
 

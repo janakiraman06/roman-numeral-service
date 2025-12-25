@@ -57,6 +57,8 @@ app:
     enabled: false  # Disable for tests
   api-security:
     enabled: false  # Disable for tests
+  kafka:
+    enabled: false  # Disable for tests (KafkaProducerService won't be created)
 
 # Disable Swagger for tests
 springdoc:

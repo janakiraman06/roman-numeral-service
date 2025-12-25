@@ -1,14 +1,15 @@
 # ============================================
 # Roman Numeral Service - Docker Compose
 # ============================================
-# Full observability stack - NO PLUGINS REQUIRED
+# Full observability + data engineering stack
 # Just run: docker-compose up -d
 #
 # Components:
 # - Application (Spring Boot + Java 21)
-# - PostgreSQL (Database)
+# - PostgreSQL (Database - OLTP)
+# - Kafka (Event streaming - Bronze layer ingestion)
 # - Prometheus (Metrics collection)
-# - Loki + Promtail (Log aggregation via file scraping)
+# - Loki + Promtail (Log aggregation)
 # - Grafana (Visualization)
 #
 # Note: Uses json-file logging driver (default) instead of
@@ -40,6 +41,46 @@ services:
       - observability
 
   # ==========================================
+  # Apache Kafka (Event Streaming)
+  # ==========================================
+  # Using KRaft mode (no Zookeeper required)
+  # Publishes conversion events for data lake ingestion
+  kafka:
+    image: bitnami/kafka:3.6
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      # KRaft settings (no Zookeeper)
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      # Listener settings
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      # Topic settings
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_NUM_PARTITIONS=3
+      - KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=1
+      # Performance
+      - KAFKA_CFG_LOG_RETENTION_HOURS=168
+      - KAFKA_CFG_LOG_SEGMENT_BYTES=1073741824
+    volumes:
+      - kafka_data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - observability
+
+  # ==========================================
   # Roman Numeral Service (Main Application)
   # ==========================================
   roman-numeral-service:
@@ -51,12 +92,18 @@ services:
       - "8080:8080"   # Application
       - "8081:8081"   # Actuator/Management
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
+      # Use dev profile for local development/testing
+      # Reviewers run docker-compose up and get the full experience
+      - SPRING_PROFILES_ACTIVE=dev
       - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
-      # Database connection
+      # Database connection (PostgreSQL in Docker)
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/romannumeral
       - SPRING_DATASOURCE_USERNAME=romannumeral
       - SPRING_DATASOURCE_PASSWORD=romannumeral_secret
+      - SPRING_DATASOURCE_DRIVER=org.postgresql.Driver
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+      # Kafka connection
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
       interval: 30s
@@ -79,6 +126,8 @@ services:
         labels: "app,logging"
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       loki:
         condition: service_started
@@ -171,6 +220,7 @@ networks:
 # ==========================================
 volumes:
   postgres_data:
+  kafka_data:
   prometheus_data:
   loki_data:
   grafana_data:

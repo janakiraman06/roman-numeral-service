@@ -18,36 +18,45 @@ spring:
       enabled: true
 
   # Database Configuration
-  # Uses environment variables with fallback to localhost for local dev
+  # Uses environment variables with fallback to H2 for standalone/testing
   # In Docker Compose: SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/romannumeral
+  # Without env var: Falls back to H2 in-memory database
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/romannumeral}
-    username: ${SPRING_DATASOURCE_USERNAME:romannumeral}
-    password: ${SPRING_DATASOURCE_PASSWORD:romannumeral_secret}
-    driver-class-name: org.postgresql.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:romannumeral;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
     hikari:
       maximum-pool-size: 10
       minimum-idle: 2
       idle-timeout: 30000
       connection-timeout: 30000
       max-lifetime: 1800000
-      # Allow startup to proceed even if DB is temporarily unavailable
-      initialization-fail-timeout: -1
 
   # JPA / Hibernate Configuration
   jpa:
     hibernate:
       ddl-auto: update  # Auto-create/update schema
     show-sql: false
-    # Defer datasource initialization to allow container startup ordering
-    defer-datasource-initialization: true
+    database-platform: ${SPRING_JPA_DATABASE_PLATFORM:org.hibernate.dialect.H2Dialect}
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc:
           time_zone: UTC
     open-in-view: false  # Disable OSIV for performance
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: 1
+      retries: 3
+      properties:
+        enable.idempotence: false
+        max.in.flight.requests.per.connection: 5
 
 # ============================================
 # Server Configuration
@@ -118,6 +127,10 @@ app:
   
   api-security:
     enabled: false  # Default: disabled. Override in application-prod.yml
+  
+  kafka:
+    enabled: false  # Default: disabled for local dev without Kafka
+    topic: romannumeral-events
 
 # ============================================
 # Logging Configuration
