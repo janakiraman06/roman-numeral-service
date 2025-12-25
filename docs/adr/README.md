@@ -36,12 +36,13 @@ What becomes easier or more difficult because of this decision?
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
 | [ADR-001](001-precomputed-cache.md) | Use Pre-computed Cache for Roman Numeral Conversion | Accepted | 2024-12-24 |
-| [ADR-002](002-virtual-threads.md) | Use Java 21 Virtual Threads for Parallel Processing | Accepted | 2024-12-24 |
+| [ADR-002](002-virtual-threads.md) | Use Java 21 Virtual Threads for Parallel Processing | Partially Superseded | 2024-12-24 |
 | [ADR-003](003-plain-text-errors.md) | Use Plain Text Error Responses | Accepted | 2024-12-24 |
 | [ADR-004](004-rate-limiting.md) | Use Bucket4j for Rate Limiting | Accepted | 2024-12-24 |
 | [ADR-005](005-observability-stack.md) | Use Prometheus, Grafana, and Loki for Observability | Accepted | 2024-12-24 |
 | [ADR-006](006-no-database.md) | No Database Required | Accepted | 2024-12-24 |
 | [ADR-007](007-array-cache-optimization.md) | Array Cache Optimization (HashMap to Array) | Accepted | 2025-12-25 |
+| [ADR-008](008-hybrid-threading-strategy.md) | Hybrid Threading Strategy (Virtual Threads + Parallel Streams) | Accepted | 2025-12-25 |
 
 ## How to Add a New ADR
 

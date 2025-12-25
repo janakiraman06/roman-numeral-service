@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Partially Superseded by [ADR-008](008-hybrid-threading-strategy.md)
+
+**Note**: Virtual threads are still used for HTTP request handling (Spring Boot).
+Range processing has been changed to use Parallel Streams (see ADR-008).
 
 ## Date
 
