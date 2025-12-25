@@ -43,6 +43,7 @@ What becomes easier or more difficult because of this decision?
 | [ADR-006](006-no-database.md) | No Database Required | Accepted | 2024-12-24 |
 | [ADR-007](007-array-cache-optimization.md) | Array Cache Optimization (HashMap to Array) | Accepted | 2025-12-25 |
 | [ADR-008](008-hybrid-threading-strategy.md) | Hybrid Threading Strategy (Virtual Threads + Parallel Streams) | Accepted | 2025-12-25 |
+| [ADR-009](009-pagination.md) | Offset-Based Pagination for Range Queries | Accepted | 2025-12-25 |
 
 ## How to Add a New ADR
 

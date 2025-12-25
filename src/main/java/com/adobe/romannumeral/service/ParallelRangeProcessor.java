@@ -2,6 +2,7 @@ package com.adobe.romannumeral.service;
 
 import com.adobe.romannumeral.converter.RomanNumeralConverter;
 import com.adobe.romannumeral.model.ConversionResult;
+import com.adobe.romannumeral.model.PagedRangeResult;
 import com.adobe.romannumeral.model.RangeConversionResult;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
@@ -57,12 +58,15 @@ public class ParallelRangeProcessor {
     private static final Logger logger = LoggerFactory.getLogger(ParallelRangeProcessor.class);
     
     /**
-     * Maximum allowed range size to prevent resource exhaustion.
-     * 
-     * <p>This protects against requests like ?min=1&max=3999 which would
-     * process 3999 items. Value chosen to balance usability and resource protection.</p>
+     * Default page size for paginated range queries.
      */
-    private static final int MAX_RANGE_SIZE = 1000;
+    public static final int DEFAULT_PAGE_SIZE = 100;
+    
+    /**
+     * Maximum page size allowed per request.
+     * Prevents resource exhaustion while allowing reasonable batch sizes.
+     */
+    public static final int MAX_PAGE_SIZE = 500;
     
     private final RomanNumeralConverter converter;
     
@@ -157,6 +161,75 @@ public class ParallelRangeProcessor {
     }
 
     /**
+     * Processes a range with pagination support.
+     * 
+     * <p>This method allows clients to request large ranges (1-3999) with pagination,
+     * returning a subset of results with metadata for navigating through pages.</p>
+     * 
+     * <h3>Pagination Parameters:</h3>
+     * <ul>
+     *   <li><b>offset:</b> Starting position (0-based), default 0</li>
+     *   <li><b>limit:</b> Maximum items to return, default 100, max 500</li>
+     * </ul>
+     * 
+     * @param min the minimum value (inclusive)
+     * @param max the maximum value (inclusive)
+     * @param offset starting position (0-based)
+     * @param limit maximum items to return
+     * @return PagedRangeResult with conversions and pagination metadata
+     * @throws IllegalArgumentException if parameters are invalid
+     * @see <a href="../../../docs/adr/009-pagination.md">ADR-009: Pagination Strategy</a>
+     */
+    public PagedRangeResult processRangePaginated(int min, int max, int offset, int limit) {
+        validateRange(min, max);
+        
+        // Validate and normalize pagination parameters
+        int effectiveLimit = Math.min(Math.max(1, limit), MAX_PAGE_SIZE);
+        int effectiveOffset = Math.max(0, offset);
+        
+        int totalItems = max - min + 1;
+        
+        // Ensure offset doesn't exceed total items
+        if (effectiveOffset >= totalItems) {
+            effectiveOffset = 0;
+        }
+        
+        // Calculate actual range to process
+        int startValue = min + effectiveOffset;
+        int endValue = Math.min(max, startValue + effectiveLimit - 1);
+        int pageSize = endValue - startValue + 1;
+        
+        // Record metrics
+        rangeRequestsCounter.increment();
+        rangeSizeDistribution.record(pageSize);
+        
+        logger.debug("Processing paginated range [{}, {}] offset={} limit={} (effective: [{}, {}])",
+            min, max, effectiveOffset, effectiveLimit, startValue, endValue);
+        
+        long startTime = System.nanoTime();
+        
+        // Process only the requested page
+        List<ConversionResult> results = IntStream.rangeClosed(startValue, endValue)
+            .parallel()
+            .mapToObj(this::convertNumber)
+            .sorted(Comparator.comparingInt(r -> Integer.parseInt(r.input())))
+            .toList();
+        
+        long endTime = System.nanoTime();
+        long durationNanos = endTime - startTime;
+        
+        rangeProcessingTimer.record(java.time.Duration.ofNanos(durationNanos));
+        
+        logger.info("Processed {} conversions (page {}/{}) in {}ms",
+            pageSize,
+            (effectiveOffset / effectiveLimit) + 1,
+            (int) Math.ceil((double) totalItems / effectiveLimit),
+            durationNanos / 1_000_000);
+        
+        return PagedRangeResult.of(results, effectiveOffset, effectiveLimit, totalItems);
+    }
+
+    /**
      * Validates the range parameters according to specification.
      * 
      * <h3>Validation Rules:</h3>
@@ -164,8 +237,9 @@ public class ParallelRangeProcessor {
      *   <li>min must be in valid range (1-3999)</li>
      *   <li>max must be in valid range (1-3999)</li>
      *   <li>min must be strictly less than max</li>
-     *   <li>Range size must not exceed maxRangeSize (resource protection)</li>
      * </ul>
+     * 
+     * <p>Note: Range size limit removed - pagination handles large ranges.</p>
      * 
      * @param min the minimum value
      * @param max the maximum value
@@ -188,13 +262,7 @@ public class ParallelRangeProcessor {
             throw new IllegalArgumentException(
                 String.format("min (%d) must be less than max (%d)", min, max));
         }
-        
-        int rangeSize = max - min + 1;
-        if (rangeSize > MAX_RANGE_SIZE) {
-            throw new IllegalArgumentException(
-                String.format("Range size (%d) exceeds maximum allowed (%d). " +
-                    "Please request a smaller range.", rangeSize, MAX_RANGE_SIZE));
-        }
+        // Range size limit removed - pagination handles large ranges (ADR-009)
     }
 
     /**

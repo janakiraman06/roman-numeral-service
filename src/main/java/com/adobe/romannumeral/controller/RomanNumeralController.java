@@ -2,7 +2,9 @@ package com.adobe.romannumeral.controller;
 
 import com.adobe.romannumeral.exception.InvalidInputException;
 import com.adobe.romannumeral.model.ConversionResult;
+import com.adobe.romannumeral.model.PagedRangeResult;
 import com.adobe.romannumeral.model.RangeConversionResult;
+import com.adobe.romannumeral.service.ParallelRangeProcessor;
 import com.adobe.romannumeral.service.RomanNumeralService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -83,7 +85,8 @@ public class RomanNumeralController {
     @Operation(
         summary = "Convert integer to Roman numeral",
         description = "Converts a single integer or a range of integers to Roman numerals. " +
-                      "Use 'query' for single conversion, or 'min' and 'max' for range conversion."
+                      "Use 'query' for single conversion, or 'min' and 'max' for range conversion. " +
+                      "Range queries support pagination with 'offset' and 'limit' parameters."
     )
     @ApiResponses(value = {
         @ApiResponse(
@@ -91,7 +94,7 @@ public class RomanNumeralController {
             description = "Successful conversion",
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(oneOf = {ConversionResult.class, RangeConversionResult.class})
+                schema = @Schema(oneOf = {ConversionResult.class, RangeConversionResult.class, PagedRangeResult.class})
             )
         ),
         @ApiResponse(
@@ -108,7 +111,13 @@ public class RomanNumeralController {
             @RequestParam(required = false) Integer min,
             
             @Parameter(description = "Maximum value for range conversion (1-3999)")
-            @RequestParam(required = false) Integer max) {
+            @RequestParam(required = false) Integer max,
+            
+            @Parameter(description = "Starting position for pagination (0-based, default: 0)")
+            @RequestParam(required = false) Integer offset,
+            
+            @Parameter(description = "Maximum items per page (default: 100, max: 500)")
+            @RequestParam(required = false) Integer limit) {
         
         // Generate correlation ID for request tracing
         String correlationId = UUID.randomUUID().toString().substring(0, 8);
@@ -117,7 +126,7 @@ public class RomanNumeralController {
         try {
             // Determine which type of request this is
             if (isRangeQuery(min, max)) {
-                return handleRangeConversion(min, max);
+                return handleRangeConversion(min, max, offset, limit);
             } else if (query != null) {
                 return handleSingleConversion(query);
             } else {
@@ -146,26 +155,59 @@ public class RomanNumeralController {
     }
 
     /**
-     * Handles range-based conversion with parallel processing.
+     * Handles range-based conversion with parallel processing and optional pagination.
+     * 
+     * <p>If offset or limit parameters are provided, returns paginated results.
+     * Otherwise, returns full range results (for backward compatibility with small ranges).</p>
      * 
      * @param min the minimum value (inclusive)
      * @param max the maximum value (inclusive)
-     * @return ResponseEntity with RangeConversionResult
+     * @param offset starting position (0-based), null for full range
+     * @param limit maximum items per page, null for full range
+     * @return ResponseEntity with RangeConversionResult or PagedRangeResult
      */
-    private ResponseEntity<RangeConversionResult> handleRangeConversion(Integer min, Integer max) {
+    private ResponseEntity<?> handleRangeConversion(Integer min, Integer max, Integer offset, Integer limit) {
         // Validate that both parameters are present
         if (min == null || max == null) {
             throw new InvalidInputException(
                 "Both 'min' and 'max' parameters are required for range conversion.");
         }
         
-        logger.info("Processing range conversion request: min={}, max={}", min, max);
+        // Check if pagination is requested
+        boolean usePagination = offset != null || limit != null;
         
-        RangeConversionResult result = romanNumeralService.convertRange(min, max);
+        // For large ranges (>500), force pagination
+        int rangeSize = max - min + 1;
+        if (rangeSize > ParallelRangeProcessor.MAX_PAGE_SIZE && !usePagination) {
+            usePagination = true;
+            logger.info("Large range ({}) detected, using pagination", rangeSize);
+        }
         
-        logger.info("Successfully converted range [{}-{}]: {} conversions", 
-            min, max, result.size());
-        return ResponseEntity.ok(result);
+        if (usePagination) {
+            int effectiveOffset = offset != null ? offset : 0;
+            int effectiveLimit = limit != null ? limit : ParallelRangeProcessor.DEFAULT_PAGE_SIZE;
+            
+            logger.info("Processing paginated range request: min={}, max={}, offset={}, limit={}", 
+                min, max, effectiveOffset, effectiveLimit);
+            
+            PagedRangeResult result = romanNumeralService.convertRangePaginated(
+                min, max, effectiveOffset, effectiveLimit);
+            
+            logger.info("Successfully converted page {}/{} of range [{}-{}]: {} conversions",
+                result.pagination().currentPage(),
+                result.pagination().totalPages(),
+                min, max, result.size());
+            
+            return ResponseEntity.ok(result);
+        } else {
+            logger.info("Processing range conversion request: min={}, max={}", min, max);
+            
+            RangeConversionResult result = romanNumeralService.convertRange(min, max);
+            
+            logger.info("Successfully converted range [{}-{}]: {} conversions", 
+                min, max, result.size());
+            return ResponseEntity.ok(result);
+        }
     }
 
     /**

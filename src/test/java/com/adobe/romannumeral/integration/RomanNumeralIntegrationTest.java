@@ -375,25 +375,45 @@ class RomanNumeralIntegrationTest {
         }
 
         @Test
-        @DisplayName("Range exceeding max size returns 400")
-        void shouldReturn400ForRangeExceedingMaxSize() throws Exception {
-            // MAX_RANGE_SIZE is 1000, so 1-1002 should fail
-            mockMvc.perform(get("/romannumeral")
-                    .param("min", "1")
-                    .param("max", "1002"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.TEXT_PLAIN))
-                .andExpect(content().string(containsString("exceeds maximum")));
-        }
-
-        @Test
-        @DisplayName("Maximum allowed range (1000 items) succeeds")
-        void shouldProcessMaxAllowedRange() throws Exception {
+        @DisplayName("Large range returns paginated response")
+        void shouldReturnPaginatedResponseForLargeRange() throws Exception {
+            // Large ranges (>500) automatically use pagination
             mockMvc.perform(get("/romannumeral")
                     .param("min", "1")
                     .param("max", "1000"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.conversions", hasSize(1000)));
+                .andExpect(jsonPath("$.conversions", hasSize(100))) // Default page size
+                .andExpect(jsonPath("$.pagination.totalItems").value(1000))
+                .andExpect(jsonPath("$.pagination.totalPages").value(10))
+                .andExpect(jsonPath("$.pagination.currentPage").value(1))
+                .andExpect(jsonPath("$.pagination.hasNext").value(true))
+                .andExpect(jsonPath("$.pagination.hasPrevious").value(false));
+        }
+
+        @Test
+        @DisplayName("Full range (1-3999) with pagination succeeds")
+        void shouldProcessFullRangeWithPagination() throws Exception {
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "1")
+                    .param("max", "3999")
+                    .param("offset", "0")
+                    .param("limit", "500"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conversions", hasSize(500)))
+                .andExpect(jsonPath("$.pagination.totalItems").value(3999))
+                .andExpect(jsonPath("$.pagination.limit").value(500));
+        }
+        
+        @Test
+        @DisplayName("Small range without pagination returns original format")
+        void shouldReturnOriginalFormatForSmallRange() throws Exception {
+            // Ranges ≤500 without explicit pagination use original format
+            mockMvc.perform(get("/romannumeral")
+                    .param("min", "1")
+                    .param("max", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conversions", hasSize(100)))
+                .andExpect(jsonPath("$.pagination").doesNotExist());
         }
     }
 
