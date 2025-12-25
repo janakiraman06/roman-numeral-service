@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+  Hive Metastore Configuration
+  Used as the Iceberg catalog for the Roman Numeral Service data lakehouse.
+  
+  This configuration enables:
+  - PostgreSQL-backed metadata storage
+  - MinIO (S3-compatible) warehouse storage
+  - Iceberg table format support
+-->
+<configuration>
+    <!-- Database Connection Settings -->
+    <property>
+        <name>javax.jdo.option.ConnectionDriverName</name>
+        <value>org.postgresql.Driver</value>
+        <description>PostgreSQL JDBC driver</description>
+    </property>
+    
+    <property>
+        <name>javax.jdo.option.ConnectionURL</name>
+        <value>jdbc:postgresql://hive-metastore-db:5432/metastore</value>
+        <description>PostgreSQL connection URL</description>
+    </property>
+    
+    <property>
+        <name>javax.jdo.option.ConnectionUserName</name>
+        <value>hive</value>
+        <description>Database username</description>
+    </property>
+    
+    <property>
+        <name>javax.jdo.option.ConnectionPassword</name>
+        <value>hive_secret</value>
+        <description>Database password</description>
+    </property>
+
+    <!-- Metastore Settings -->
+    <property>
+        <name>hive.metastore.uris</name>
+        <value>thrift://hive-metastore:9083</value>
+        <description>Thrift URI for the metastore</description>
+    </property>
+    
+    <property>
+        <name>hive.metastore.warehouse.dir</name>
+        <value>s3a://lakehouse/warehouse</value>
+        <description>Default warehouse location in MinIO</description>
+    </property>
+
+    <!-- Schema Initialization -->
+    <property>
+        <name>datanucleus.schema.autoCreateAll</name>
+        <value>true</value>
+        <description>Auto-create schema on first run</description>
+    </property>
+    
+    <property>
+        <name>hive.metastore.schema.verification</name>
+        <value>false</value>
+        <description>Skip schema verification for development</description>
+    </property>
+
+    <!-- S3/MinIO Settings -->
+    <property>
+        <name>fs.s3a.endpoint</name>
+        <value>http://minio:9000</value>
+        <description>MinIO S3 endpoint</description>
+    </property>
+    
+    <property>
+        <name>fs.s3a.access.key</name>
+        <value>minioadmin</value>
+        <description>MinIO access key</description>
+    </property>
+    
+    <property>
+        <name>fs.s3a.secret.key</name>
+        <value>minioadmin123</value>
+        <description>MinIO secret key</description>
+    </property>
+    
+    <property>
+        <name>fs.s3a.path.style.access</name>
+        <value>true</value>
+        <description>Use path-style access for MinIO</description>
+    </property>
+    
+    <property>
+        <name>fs.s3a.impl</name>
+        <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
+        <description>S3A filesystem implementation</description>
+    </property>
+
+    <!-- Iceberg Support -->
+    <property>
+        <name>iceberg.engine.hive.enabled</name>
+        <value>true</value>
+        <description>Enable Iceberg table format</description>
+    </property>
+</configuration>
+

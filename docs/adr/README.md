@@ -46,6 +46,7 @@ What becomes easier or more difficult because of this decision?
 | [ADR-009](009-pagination.md) | Offset-Based Pagination for Range Queries | Accepted | 2025-12-25 |
 | [ADR-010](010-api-key-authentication.md) | API Key Authentication | Accepted | 2025-12-25 |
 | [ADR-011](011-event-driven-architecture.md) | Event-Driven Architecture with Apache Kafka | Accepted | 2025-12-25 |
+| [ADR-012](012-unified-lakehouse-architecture.md) | Unified Lakehouse Architecture | Accepted | 2025-12-25 |
 
 ## How to Add a New ADR
 
