@@ -1,14 +1,38 @@
 # ============================================
 # Roman Numeral Service - Docker Compose
 # ============================================
-# Full observability stack:
+# Full stack:
 # - Application (Spring Boot)
+# - PostgreSQL (Database)
 # - Prometheus (Metrics collection)
 # - Loki (Log aggregation)
 # - Grafana (Visualization)
 # ============================================
 
 services:
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: romannumeral
+      POSTGRES_USER: romannumeral
+      POSTGRES_PASSWORD: romannumeral_secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U romannumeral -d romannumeral"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability
+
   # ==========================================
   # Roman Numeral Service (Main Application)
   # ==========================================
@@ -23,6 +47,10 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+      # Database connection
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/romannumeral
+      - SPRING_DATASOURCE_USERNAME=romannumeral
+      - SPRING_DATASOURCE_PASSWORD=romannumeral_secret
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health"]
       interval: 30s
@@ -43,7 +71,10 @@ services:
         loki-timeout: "2s"
         labels: "app,container_name"
     depends_on:
-      - loki
+      postgres:
+        condition: service_healthy
+      loki:
+        condition: service_started
 
   # ==========================================
   # Prometheus (Metrics Collection)
@@ -129,6 +160,7 @@ networks:
 # Volumes
 # ==========================================
 volumes:
+  postgres_data:
   prometheus_data:
   loki_data:
   grafana_data:

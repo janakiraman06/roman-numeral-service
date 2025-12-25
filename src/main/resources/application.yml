@@ -17,6 +17,32 @@ spring:
     virtual:
       enabled: true
 
+  # Database Configuration (defaults for dev, overridden in prod)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/romannumeral
+    username: romannumeral
+    password: romannumeral_secret
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+
+  # JPA / Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update  # Auto-create/update schema (use 'validate' in prod with migrations)
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+    open-in-view: false  # Disable OSIV for performance
+
 # ============================================
 # Server Configuration
 # ============================================

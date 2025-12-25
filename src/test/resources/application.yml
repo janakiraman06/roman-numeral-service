@@ -1,0 +1,74 @@
+# ============================================
+# Test Configuration (Default for all tests)
+# ============================================
+# Uses H2 in-memory database to avoid needing PostgreSQL
+# ============================================
+
+spring:
+  application:
+    name: roman-numeral-service-test
+
+  # H2 in-memory database for testing
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+
+  # Jackson configuration
+  jackson:
+    property-naming-strategy: LOWER_CAMEL_CASE
+    serialization:
+      write-dates-as-timestamps: false
+
+  # Virtual Threads
+  threads:
+    virtual:
+      enabled: true
+
+# Server configuration
+server:
+  port: 0  # Random port for tests
+
+# Management on same port for test simplicity
+management:
+  server:
+    port: 0
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+
+# App configuration
+app:
+  roman-numeral:
+    min-value: 1
+    max-value: 3999
+  rate-limiting:
+    enabled: false  # Disable for tests
+  api-security:
+    enabled: false  # Disable for tests
+
+# Disable Swagger for tests
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+# Minimal logging during tests
+logging:
+  level:
+    com.adobe.romannumeral: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+

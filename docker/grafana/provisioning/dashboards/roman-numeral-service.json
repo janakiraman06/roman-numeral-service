@@ -667,6 +667,504 @@
     {
       "collapsed": false,
       "gridPos": {"h": 1, "w": 24, "x": 0, "y": 39},
+      "id": 104,
+      "panels": [],
+      "title": "🧵 Virtual Threads Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {"type": "linear"},
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 40},
+      "id": 20,
+      "options": {
+        "legend": {"calcs": ["mean", "max", "sum"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "expr": "rate(virtual_threads_total[1m])",
+          "legendFormat": "VThreads/sec",
+          "refId": "A"
+        }
+      ],
+      "title": "🧵 Virtual Threads Created (rate)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {"type": "linear"},
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "ms"
+        }
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 40},
+      "id": 21,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "expr": "(rate(range_processing_time_seconds_sum[5m]) / rate(range_processing_time_seconds_count[5m])) * 1000",
+          "legendFormat": "Avg Processing Time",
+          "refId": "A"
+        },
+        {
+          "expr": "range_processing_time_seconds_max * 1000",
+          "legendFormat": "Max Processing Time",
+          "refId": "B"
+        }
+      ],
+      "title": "⏱️ Range Processing Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {"type": "linear"},
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 40},
+      "id": 22,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "expr": "range_processing_size_items{quantile=\"0.5\"}",
+          "legendFormat": "p50 Range Size",
+          "refId": "A"
+        },
+        {
+          "expr": "range_processing_size_items{quantile=\"0.95\"}",
+          "legendFormat": "p95 Range Size",
+          "refId": "B"
+        },
+        {
+          "expr": "range_processing_size_items_max",
+          "legendFormat": "Max Range Size",
+          "refId": "C"
+        }
+      ],
+      "title": "📏 Range Size Distribution",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [
+            {"options": {"match": "null", "result": {"text": "No traffic", "color": "text"}}, "type": "special"},
+            {"options": {"from": -1, "to": 0.5, "result": {"text": "No traffic", "color": "text"}}, "type": "range"}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 48},
+      "id": 23,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "targets": [
+        {
+          "expr": "sum(virtual_threads_total) or vector(0)",
+          "legendFormat": "Total",
+          "refId": "A"
+        }
+      ],
+      "title": "🧵 Total VThreads Created",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "mappings": [
+            {"options": {"match": "null", "result": {"text": "No traffic", "color": "text"}}, "type": "special"},
+            {"options": {"from": -1, "to": 0.5, "result": {"text": "No traffic", "color": "text"}}, "type": "range"}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "purple", "value": null}]},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 48},
+      "id": 24,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "targets": [
+        {
+          "expr": "sum(range_requests_total) or vector(0)",
+          "legendFormat": "Total",
+          "refId": "A"
+        }
+      ],
+      "title": "📊 Total Range Requests",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [
+            {
+              "options": {"match": "null", "result": {"text": "No data"}},
+              "type": "special"
+            }
+          ],
+          "mappings": [
+            {"options": {"match": "null", "result": {"text": "No traffic", "color": "text"}}, "type": "special"}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": null}]},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 48},
+      "id": 25,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}
+      },
+      "targets": [
+        {
+          "expr": "range_processing_size_items_sum / range_processing_size_items_count",
+          "legendFormat": "Avg",
+          "refId": "A"
+        }
+      ],
+      "title": "📏 Avg Range Size",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [
+            {"options": {"match": "null", "result": {"text": "No traffic", "color": "text"}}, "type": "special"},
+            {"options": {"from": -1, "to": 0.001, "result": {"text": "No traffic", "color": "text"}}, "type": "range"}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "ms"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 48},
+      "id": 26,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}
+      },
+      "targets": [
+        {
+          "expr": "(range_processing_time_seconds_sum / range_processing_time_seconds_count) * 1000 or vector(0)",
+          "legendFormat": "Avg",
+          "refId": "A"
+        }
+      ],
+      "title": "⏱️ Avg Range Processing",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [
+            {"options": {"match": "null", "result": {"text": "No traffic", "color": "text"}}, "type": "special"},
+            {"options": {"from": -1, "to": 0.001, "result": {"text": "No traffic", "color": "text"}}, "type": "range"}
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 90},
+              {"color": "red", "value": 98}
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 52},
+      "id": 30,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "targets": [
+        {
+          "expr": "virtual_thread_overhead_percent{quantile=\"0.5\"} or vector(-1)",
+          "legendFormat": "p50 Overhead %",
+          "refId": "A"
+        }
+      ],
+      "title": "⚡ VThread Overhead % (p50)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Microseconds",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "opacity",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {"type": "linear"},
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "normal"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "ns"
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Work Time"}, "properties": [{"id": "color", "value": {"fixedColor": "green", "mode": "fixed"}}]},
+          {"matcher": {"id": "byName", "options": "Overhead"}, "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]}
+        ]
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 52},
+      "id": 31,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "expr": "virtual_thread_work_time_nanoseconds{quantile=\"0.5\"}",
+          "legendFormat": "Work Time",
+          "refId": "A"
+        },
+        {
+          "expr": "virtual_thread_overhead_nanoseconds{quantile=\"0.5\"}",
+          "legendFormat": "Overhead",
+          "refId": "B"
+        }
+      ],
+      "title": "⚡ Work Time vs Overhead (p50)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {"type": "linear"},
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "percent"
+        }
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 52},
+      "id": 32,
+      "options": {
+        "legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "targets": [
+        {
+          "expr": "virtual_thread_overhead_percent{quantile=\"0.5\"}",
+          "legendFormat": "p50 Overhead %",
+          "refId": "A"
+        },
+        {
+          "expr": "virtual_thread_overhead_percent{quantile=\"0.95\"}",
+          "legendFormat": "p95 Overhead %",
+          "refId": "B"
+        },
+        {
+          "expr": "virtual_thread_overhead_percent{quantile=\"0.99\"}",
+          "legendFormat": "p99 Overhead %",
+          "refId": "C"
+        }
+      ],
+      "title": "⚡ Overhead % Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"match": "null", "result": {"text": "No traffic", "color": "text"}}, "type": "special"}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]},
+          "unit": "ns"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 56},
+      "id": 33,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "targets": [
+        {
+          "expr": "virtual_thread_work_time_nanoseconds_sum / virtual_thread_work_time_nanoseconds_count",
+          "legendFormat": "Avg",
+          "refId": "A"
+        }
+      ],
+      "title": "💪 Avg Work Time",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"match": "null", "result": {"text": "No traffic", "color": "text"}}, "type": "special"}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": null}]},
+          "unit": "ns"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 56},
+      "id": 34,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "targets": [
+        {
+          "expr": "virtual_thread_overhead_nanoseconds_sum / virtual_thread_overhead_nanoseconds_count",
+          "legendFormat": "Avg",
+          "refId": "A"
+        }
+      ],
+      "title": "🐢 Avg Overhead",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 60},
       "id": 103,
       "panels": [],
       "title": "📋 Logs (Loki)",
@@ -674,7 +1172,7 @@
     },
     {
       "datasource": {"type": "loki", "uid": "loki"},
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 61},
       "id": 15,
       "options": {
         "dedupStrategy": "none",

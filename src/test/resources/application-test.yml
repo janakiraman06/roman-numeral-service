@@ -1,0 +1,42 @@
+# ============================================
+# Test Profile Configuration
+# ============================================
+# Used for unit and integration tests
+# ============================================
+
+spring:
+  # H2 in-memory database for testing
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+# Disable API security for tests
+app:
+  api-security:
+    enabled: false
+  rate-limiting:
+    enabled: false
+
+# Disable Swagger for tests
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+# Minimal logging during tests
+logging:
+  level:
+    com.adobe.romannumeral: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+
