@@ -41,6 +41,7 @@ What becomes easier or more difficult because of this decision?
 | [ADR-004](004-rate-limiting.md) | Use Bucket4j for Rate Limiting | Accepted | 2024-12-24 |
 | [ADR-005](005-observability-stack.md) | Use Prometheus, Grafana, and Loki for Observability | Accepted | 2024-12-24 |
 | [ADR-006](006-no-database.md) | No Database Required | Accepted | 2024-12-24 |
+| [ADR-007](007-array-cache-optimization.md) | Array Cache Optimization (HashMap to Array) | Accepted | 2025-12-25 |
 
 ## How to Add a New ADR
 
