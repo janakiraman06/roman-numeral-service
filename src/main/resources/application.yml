@@ -82,7 +82,10 @@ app:
   
   rate-limiting:
     enabled: true
-    requests-per-minute: 100  # Production value - adjust for load testing
+    requests-per-minute: 100  # Default value - overridden by profile
+  
+  api-security:
+    enabled: false  # Default: disabled. Override in application-prod.yml
 
 # ============================================
 # Logging Configuration

@@ -1,0 +1,48 @@
+# ============================================
+# Development Profile Configuration
+# ============================================
+# Activated with: --spring.profiles.active=dev
+# or SPRING_PROFILES_ACTIVE=dev
+#
+# Purpose: Local development with relaxed settings for easy testing
+# ============================================
+
+# Development-specific overrides
+app:
+  rate-limiting:
+    enabled: true
+    requests-per-minute: 1000  # Relaxed for load testing
+  
+  api-security:
+    enabled: false  # No API key required for local development
+
+# Verbose logging for debugging
+logging:
+  level:
+    com.adobe.romannumeral: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# Full Swagger access for API exploration
+springdoc:
+  swagger-ui:
+    enabled: true
+
+# Expose all actuator endpoints for debugging
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+# More detailed error information for debugging
+server:
+  error:
+    include-message: always
+    include-stacktrace: on_param  # Add ?trace=true to see stack traces
+    include-exception: true
+

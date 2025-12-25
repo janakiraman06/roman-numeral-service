@@ -1,0 +1,50 @@
+# ============================================
+# Production Profile Configuration
+# ============================================
+# Activated with: --spring.profiles.active=prod
+# or SPRING_PROFILES_ACTIVE=prod
+#
+# Purpose: Production-ready settings with security and minimal logging
+# ============================================
+
+# Production-specific overrides
+app:
+  rate-limiting:
+    enabled: true
+    requests-per-minute: 100  # Strict rate limiting
+  
+  api-security:
+    enabled: true  # Require API key for all requests
+
+# Minimal logging for performance
+logging:
+  level:
+    com.adobe.romannumeral: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+    root: WARN
+
+# Disable Swagger UI for security
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+# Limited actuator endpoints for security
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+# Minimal error details for security
+server:
+  error:
+    include-message: always
+    include-stacktrace: never
+    include-exception: false
+
