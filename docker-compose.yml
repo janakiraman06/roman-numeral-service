@@ -12,6 +12,7 @@
 # - Hive Metastore (Iceberg catalog)
 # - Flink (Streaming engine - Bronze layer)
 # - Spark (Batch engine - Silver/Gold layers)
+# - Airflow (Orchestration - ETL scheduling)
 # - Prometheus (Metrics collection)
 # - Loki + Promtail (Log aggregation)
 # - Grafana (Visualization)
@@ -327,6 +328,72 @@ services:
       - observability
 
   # ==========================================
+  # Apache Airflow (Orchestration)
+  # ==========================================
+  # Schedules and monitors Silver/Gold ETL jobs
+  # UI available at http://localhost:8093
+  airflow:
+    image: apache/airflow:2.8.1-python3.11
+    container_name: airflow
+    ports:
+      - "8093:8080"   # Airflow Web UI
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow_secret@airflow-db:5432/airflow
+      - AIRFLOW__WEBSERVER__SECRET_KEY=your-secret-key-change-in-prod
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+      # Spark connection
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      # MinIO connection
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin123
+      - AWS_ENDPOINT_URL=http://minio:9000
+    volumes:
+      - ./data-platform/airflow/dags:/opt/airflow/dags:ro
+      - ./data-platform/airflow/plugins:/opt/airflow/plugins:ro
+      - ./data-platform/airflow/logs:/opt/airflow/logs
+      - ./data-platform/spark/jobs:/opt/spark-jobs:ro
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+        airflow webserver & airflow scheduler
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      spark-master:
+        condition: service_healthy
+    networks:
+      - observability
+
+  # Airflow Database (PostgreSQL)
+  airflow-db:
+    image: postgres:16-alpine
+    container_name: airflow-db
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow_secret
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability
+
+  # ==========================================
   # Roman Numeral Service (Main Application)
   # ==========================================
   roman-numeral-service:
@@ -472,6 +539,7 @@ volumes:
   hive_warehouse:
   flink_data:
   spark_data:
+  airflow_db_data:
   prometheus_data:
   loki_data:
   grafana_data:
