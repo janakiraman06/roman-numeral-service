@@ -17,6 +17,7 @@
 # - Loki + Promtail (Log aggregation)
 # - Grafana (Visualization)
 # - Marquez (Data lineage with OpenLineage)
+# - Superset (BI dashboards)
 #
 # Note: Uses json-file logging driver (default) instead of
 # Loki plugin. Promtail scrapes logs from Docker log files.
@@ -601,6 +602,76 @@ services:
     labels:
       logging: "promtail"
 
+  # ==========================================
+  # Apache Superset (BI Dashboards)
+  # ==========================================
+  # Web UI: http://localhost:8088
+  # Default login: admin / admin
+  # ==========================================
+  
+  superset:
+    image: apache/superset:3.1.0
+    container_name: superset
+    ports:
+      - "8088:8088"
+    environment:
+      # Database connection for Superset metadata
+      SUPERSET_SECRET_KEY: "rns_superset_secret_key_change_in_prod"
+      DATABASE_URL: "postgresql+psycopg2://superset:superset_secret@superset-db:5432/superset"
+      REDIS_URL: "redis://superset-redis:6379/0"
+      # Flask settings
+      FLASK_ENV: development
+      SUPERSET_LOAD_EXAMPLES: "no"
+    volumes:
+      - ./docker/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - superset_home:/app/superset_home
+    command: >
+      bash -c "
+        superset db upgrade &&
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@example.com --password admin || true &&
+        superset init &&
+        superset run -h 0.0.0.0 -p 8088 --with-threads --reload
+      "
+    depends_on:
+      superset-db:
+        condition: service_healthy
+      superset-redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - observability
+    labels:
+      logging: "promtail"
+
+  superset-db:
+    image: postgres:16-alpine
+    container_name: superset-db
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset_secret
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset -d superset"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability
+
+  superset-redis:
+    image: redis:7-alpine
+    container_name: superset-redis
+    volumes:
+      - superset_redis_data:/data
+    networks:
+      - observability
+
 # ==========================================
 # Networks
 # ==========================================
@@ -624,4 +695,7 @@ volumes:
   loki_data:
   grafana_data:
   marquez_db_data:
+  superset_home:
+  superset_db_data:
+  superset_redis_data:
 
