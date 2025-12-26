@@ -300,6 +300,7 @@ services:
     image: apache/airflow:2.8.1-python3.11
     container_name: airflow
     user: root  # Required for Docker socket access
+    entrypoint: /bin/bash  # Override default entrypoint to control init sequence
     ports:
       - "8093:8080"   # Airflow Web UI
     environment:
@@ -323,25 +324,28 @@ services:
       - ./data-platform/spark/jobs:/opt/spark-jobs:ro
       # Mount Docker socket for running spark-submit via docker exec
       - /var/run/docker.sock:/var/run/docker.sock
-    command: >
-      bash -c "
-        echo 'Installing Docker CLI 25.0.3 (API 1.44+)...' &&
-        curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-25.0.3.tgz -o /tmp/docker.tgz &&
-        tar -xzf /tmp/docker.tgz -C /tmp &&
-        mv /tmp/docker/docker /usr/local/bin/docker &&
-        chmod +x /usr/local/bin/docker &&
-        rm -rf /tmp/docker /tmp/docker.tgz &&
-        echo 'Docker CLI installed:' && docker --version &&
-        echo 'Waiting for Airflow DB to be ready...' &&
-        until airflow db check 2>/dev/null; do
+    command:
+      - -c
+      - |
+        echo 'Installing Docker CLI 25.0.3 (API 1.44+)...'
+        curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-25.0.3.tgz -o /tmp/docker.tgz
+        tar -xzf /tmp/docker.tgz -C /tmp
+        mv /tmp/docker/docker /usr/local/bin/docker
+        chmod +x /usr/local/bin/docker
+        rm -rf /tmp/docker /tmp/docker.tgz
+        echo "Docker CLI installed:" && docker --version
+        echo 'Waiting for Airflow DB to be ready...'
+        apt-get update -qq && apt-get install -qq -y postgresql-client > /dev/null 2>&1
+        until pg_isready -h airflow-db -U airflow -d airflow -q; do
           echo 'DB not ready, retrying in 5s...'
           sleep 5
-        done &&
-        echo 'DB ready, initializing...' &&
-        airflow db init &&
-        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
-        airflow webserver & airflow scheduler
-      "
+        done
+        echo 'DB ready, initializing...'
+        su -s /bin/bash airflow -c "airflow db migrate"
+        su -s /bin/bash airflow -c "airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com" || true
+        chmod 666 /var/run/docker.sock
+        su -s /bin/bash airflow -c "airflow webserver" &
+        su -s /bin/bash airflow -c "airflow scheduler"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
