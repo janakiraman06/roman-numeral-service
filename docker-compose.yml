@@ -54,37 +54,34 @@ services:
   # Using KRaft mode (no Zookeeper required)
   # Publishes conversion events for data lake ingestion
   kafka:
-    image: bitnami/kafka:3.6
+    image: apache/kafka:3.7.0
     container_name: kafka
     ports:
       - "9092:9092"
       - "9094:9094"
     environment:
-      # KRaft settings (no Zookeeper)
-      - KAFKA_CFG_NODE_ID=1
-      - KAFKA_CFG_PROCESS_ROLES=broker,controller
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      # Listener settings
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      # Topic settings
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-      - KAFKA_CFG_NUM_PARTITIONS=3
-      - KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=1
-      # Performance
-      - KAFKA_CFG_LOG_RETENTION_HOURS=168
-      - KAFKA_CFG_LOG_SEGMENT_BYTES=1073741824
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     volumes:
-      - kafka_data:/bitnami/kafka
+      - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     networks:
       - observability
 
@@ -205,24 +202,24 @@ services:
       - "8092:8081"   # Flink Web UI
       - "6123:6123"   # RPC port
     environment:
-      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
-      - FLINK_PROPERTIES=
-          jobmanager.rpc.address: flink-jobmanager
-          state.backend: rocksdb
-          state.backend.rocksdb.localdir: /tmp/flink-rocksdb
-          state.checkpoints.dir: s3://lakehouse/flink/checkpoints
-          state.savepoints.dir: s3://lakehouse/flink/savepoints
-          execution.checkpointing.interval: 60000
-          execution.checkpointing.mode: EXACTLY_ONCE
-          execution.checkpointing.min-pause: 30000
-          execution.checkpointing.timeout: 600000
-          restart-strategy: fixed-delay
-          restart-strategy.fixed-delay.attempts: 3
-          restart-strategy.fixed-delay.delay: 30s
-          s3.endpoint: http://minio:9000
-          s3.path-style-access: true
-          s3.access-key: minioadmin
-          s3.secret-key: minioadmin123
+      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        state.backend: rocksdb
+        state.backend.rocksdb.localdir: /tmp/flink-rocksdb
+        state.checkpoints.dir: s3://lakehouse/flink/checkpoints
+        state.savepoints.dir: s3://lakehouse/flink/savepoints
+        execution.checkpointing.interval: 60000
+        execution.checkpointing.mode: EXACTLY_ONCE
+        execution.checkpointing.min-pause: 30000
+        execution.checkpointing.timeout: 600000
+        restart-strategy: fixed-delay
+        restart-strategy.fixed-delay.attempts: 3
+        restart-strategy.fixed-delay.delay: 30s
+        s3.endpoint: http://minio:9000
+        s3.path-style-access: true
+        s3.access-key: minioadmin
+        s3.secret-key: minioadmin123
     volumes:
       - ./data-platform/flink/bronze-ingestion:/opt/flink-jobs/bronze-ingestion:ro
       - ./data-platform/flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml:ro
@@ -250,17 +247,17 @@ services:
     image: flink:1.18-scala_2.12-java11
     container_name: flink-taskmanager
     environment:
-      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
-      - FLINK_PROPERTIES=
-          jobmanager.rpc.address: flink-jobmanager
-          taskmanager.numberOfTaskSlots: 4
-          taskmanager.memory.process.size: 2g
-          state.backend: rocksdb
-          state.backend.rocksdb.localdir: /tmp/flink-rocksdb
-          s3.endpoint: http://minio:9000
-          s3.path-style-access: true
-          s3.access-key: minioadmin
-          s3.secret-key: minioadmin123
+      JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        taskmanager.memory.process.size: 2g
+        state.backend: rocksdb
+        state.backend.rocksdb.localdir: /tmp/flink-rocksdb
+        s3.endpoint: http://minio:9000
+        s3.path-style-access: true
+        s3.access-key: minioadmin
+        s3.secret-key: minioadmin123
     volumes:
       - ./data-platform/flink/bronze-ingestion:/opt/flink-jobs/bronze-ingestion:ro
       - flink_data:/tmp/flink-rocksdb
