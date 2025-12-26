@@ -1,14 +1,27 @@
 """
-Bronze Layer Ingestion: Kafka → Iceberg
-========================================
-Reads conversion events from Kafka and writes to Bronze Iceberg table.
+Bronze Layer Batch Backfill: Kafka → Iceberg
+=============================================
+PySpark batch job for Bronze layer backfill and recovery scenarios.
+
+NOTE: For real-time streaming ingestion, use the Flink job instead:
+      data-platform/flink/bronze-ingestion/
+
+This Spark job is intended for:
+- Historical data backfills
+- Reprocessing after schema changes
+- Recovery when Flink is unavailable
+- Development/testing without Flink complexity
 
 Usage:
     spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0 \
-        bronze_kafka_ingestion.py
+        bronze_batch_backfill.py
 
-Or run in streaming mode:
-    spark-submit ... bronze_kafka_ingestion.py --streaming
+Or run in streaming mode (for testing):
+    spark-submit ... bronze_batch_backfill.py --streaming
+
+Architecture:
+    Real-time (Flink):  API → Kafka → Flink → Bronze (primary path)
+    Batch (Spark):      API → Kafka → Spark → Bronze (backfill/recovery)
 """
 
 import sys

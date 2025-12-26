@@ -205,10 +205,9 @@ services:
       JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
-        state.backend: rocksdb
-        state.backend.rocksdb.localdir: /tmp/flink-rocksdb
-        state.checkpoints.dir: s3://lakehouse/flink/checkpoints
-        state.savepoints.dir: s3://lakehouse/flink/savepoints
+        state.backend: hashmap
+        state.checkpoints.dir: file:///tmp/flink-checkpoints
+        state.savepoints.dir: file:///tmp/flink-savepoints
         execution.checkpointing.interval: 60000
         execution.checkpointing.mode: EXACTLY_ONCE
         execution.checkpointing.min-pause: 30000
@@ -216,14 +215,9 @@ services:
         restart-strategy: fixed-delay
         restart-strategy.fixed-delay.attempts: 3
         restart-strategy.fixed-delay.delay: 30s
-        s3.endpoint: http://minio:9000
-        s3.path-style-access: true
-        s3.access-key: minioadmin
-        s3.secret-key: minioadmin123
     volumes:
       - ./data-platform/flink/bronze-ingestion:/opt/flink-jobs/bronze-ingestion:ro
       - ./data-platform/flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml:ro
-      - flink_data:/tmp/flink-rocksdb
     command: jobmanager
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
@@ -252,15 +246,11 @@ services:
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
         taskmanager.memory.process.size: 2g
-        state.backend: rocksdb
-        state.backend.rocksdb.localdir: /tmp/flink-rocksdb
-        s3.endpoint: http://minio:9000
-        s3.path-style-access: true
-        s3.access-key: minioadmin
-        s3.secret-key: minioadmin123
+        state.backend: hashmap
+        state.checkpoints.dir: file:///tmp/flink-checkpoints
+        state.savepoints.dir: file:///tmp/flink-savepoints
     volumes:
       - ./data-platform/flink/bronze-ingestion:/opt/flink-jobs/bronze-ingestion:ro
-      - flink_data:/tmp/flink-rocksdb
     command: taskmanager
     depends_on:
       flink-jobmanager:

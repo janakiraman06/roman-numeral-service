@@ -127,3 +127,7 @@ docs/DATA_MODELING.md
 docs/DATA_STANDARDS.md
 TECH_DECISIONS.md
 
+
+# Flink build artifacts
+data-platform/flink/bronze-ingestion/target/
+data-platform/flink/bronze-ingestion/dependency-reduced-pom.xml

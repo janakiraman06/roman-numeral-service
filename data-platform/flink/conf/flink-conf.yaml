@@ -30,14 +30,11 @@ taskmanager.memory.managed.fraction: 0.4
 parallelism.default: 2
 
 # ============================================
-# State Backend (RocksDB)
+# State Backend (HashMaps for dev, RocksDB for prod)
 # ============================================
-# RocksDB enables efficient state management
-# for deduplication and windowing
-state.backend: rocksdb
-state.backend.rocksdb.localdir: /tmp/flink-rocksdb
-state.backend.incremental: true
-state.backend.rocksdb.checkpoint.transfer.thread.num: 4
+# Using hashmap (in-memory) for local dev simplicity
+# For production, switch to RocksDB for larger state
+state.backend: hashmap
 
 # ============================================
 # Checkpointing (Exactly-Once Semantics)
@@ -50,9 +47,10 @@ execution.checkpointing.timeout: 600000
 execution.checkpointing.max-concurrent-checkpoints: 1
 execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
 
-# Checkpoint storage (MinIO/S3)
-state.checkpoints.dir: s3://lakehouse/flink/checkpoints
-state.savepoints.dir: s3://lakehouse/flink/savepoints
+# Checkpoint storage (local filesystem for dev)
+# For production, use S3 with flink-s3-fs-hadoop plugin
+state.checkpoints.dir: file:///tmp/flink-checkpoints
+state.savepoints.dir: file:///tmp/flink-savepoints
 
 # ============================================
 # Restart Strategy (Failure Recovery)
@@ -61,15 +59,6 @@ state.savepoints.dir: s3://lakehouse/flink/savepoints
 restart-strategy: fixed-delay
 restart-strategy.fixed-delay.attempts: 3
 restart-strategy.fixed-delay.delay: 30s
-
-# ============================================
-# S3/MinIO Configuration
-# ============================================
-# Path-style access required for MinIO
-s3.endpoint: http://minio:9000
-s3.path-style-access: true
-s3.access-key: minioadmin
-s3.secret-key: minioadmin123
 
 # ============================================
 # Kafka Consumer Configuration
