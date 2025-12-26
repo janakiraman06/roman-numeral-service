@@ -274,7 +274,7 @@ docker exec flink-jobmanager flink run \
 
 # Spark Silver/Gold Batch (via Airflow)
 docker exec spark-master spark-submit --master spark://spark-master:7077 \
-  /opt/spark-jobs/silver_etl.py
+  /opt/spark-jobs/silver_elt.py
 ```
 
 ### Language Choices

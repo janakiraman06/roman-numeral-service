@@ -285,8 +285,8 @@ open http://localhost:8093
 
 # Trigger DAGs in order:
 # 1. rns_bronze_ingestion - Kafka → Bronze layer
-# 2. rns_silver_etl - Bronze → Silver layer  
-# 3. rns_gold_etl - Silver → Gold layer
+# 2. rns_silver_elt - Bronze → Silver layer  
+# 3. rns_gold_elt - Silver → Gold layer
 
 # List DAGs
 docker exec -u airflow airflow airflow dags list
@@ -309,7 +309,7 @@ docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
   --master 'local[2]' \
   --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
   --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
-  /opt/spark-jobs/silver_etl.py \
+  /opt/spark-jobs/silver_elt.py \
   --interval-start '2025-01-01T00:00:00' \
   --interval-end '2025-12-31T00:00:00'
 
@@ -318,7 +318,7 @@ docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
   --master 'local[2]' \
   --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
   --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
-  /opt/spark-jobs/gold_etl.py \
+  /opt/spark-jobs/gold_elt.py \
   --interval-start '2025-01-01T00:00:00' \
   --interval-end '2025-12-31T00:00:00'
 ```

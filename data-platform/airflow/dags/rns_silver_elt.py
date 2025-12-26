@@ -1,11 +1,28 @@
 """
-Gold Layer ETL DAG
-==================
-Runs Spark job to transform Silver layer data to Gold layer (analytics-ready).
+Silver Layer ELT DAG
+====================
+Runs Spark job to transform Bronze layer data to Silver layer.
 
-Schedule: Daily at 1:00 AM UTC
+Schedule: Hourly
 Author: Roman Numeral Service Data Platform
-Version: 3.1.0
+Version: 3.2.0
+
+## Architecture Note: Combined Fact + Dimension Pipeline
+--------------------------------------------------------
+This DAG processes both fact_conversions and dim_users in a single pipeline.
+
+- Demo: Combined for simplicity and faster iteration
+- Production: Consider separate DAGs per table for:
+  - Independent SLAs (dims often need to be ready before facts)
+  - Independent retries (dim failure shouldn't block fact)
+  - Reusability (dim_users may feed multiple fact tables)
+  - Different resource requirements and schedules
+
+## Why ELT (not ETL)?
+---------------------
+Data is first Loaded to Bronze (raw), then Transformed in-place within
+the lakehouse (Bronze → Silver → Gold). This is the modern Medallion
+architecture pattern used by Databricks, Snowflake, and Iceberg-based platforms.
 
 ## Demo vs Production Configuration Notes
 -----------------------------------------
@@ -13,22 +30,22 @@ Version: 3.1.0
 ### Current Config (Demo-Optimized):
 - retries: 1 (fast failure visibility for reviewer)
 - retry_delay: 1 min (quick retest cycle)
-- execution_timeout: 15 min (prevent stuck tasks)
+- execution_timeout: 10 min (prevent stuck tasks)
 - catchup: False (no backfill on deploy)
 
 ### Production Enhancements:
-- retries: 3 with exponential backoff
-- retry_delay: 10 min initial (Gold is heavier)
-- execution_timeout: 1-2 hours (aggregations are heavy)
-- dagrun_timeout: 4 hours
-- sla: timedelta(hours=1) for daily aggregations
+- retries: 3 with exponential backoff (retry_delay * 2^attempt)
+- retry_delay: 5 min initial
+- execution_timeout: 30-60 min (based on data volume)
+- dagrun_timeout: 2-4 hours
+- sla: timedelta(minutes=45) per critical task
 - sla_miss_callback: Alert to PagerDuty/Slack
-- on_failure_callback: Slack + PagerDuty + Email for Gold (business-critical)
-- pool: 'spark_pool' with higher priority than Silver
-- priority_weight: 20 (Gold is more business-critical)
-- ExternalTaskSensor: timeout=3600, mode='reschedule' (not 'poke')
+- on_failure_callback: Slack + PagerDuty integration
+- pool: 'spark_pool' (limit concurrent Spark jobs)
+- priority_weight: Set based on business criticality
 - Catchup: True with careful backfill testing
-- depends_on_past: True for strict sequential aggregations
+- depends_on_past: True for strict sequential processing
+- wait_for_downstream: True for data dependencies
 """
 
 from datetime import datetime, timedelta
@@ -36,7 +53,6 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
-from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.utils.trigger_rule import TriggerRule
 
 
@@ -44,19 +60,19 @@ from airflow.utils.trigger_rule import TriggerRule
 # Configuration
 # =============================================================================
 
-DAG_ID = "rns_gold_etl"
+DAG_ID = "rns_silver_elt"
 OWNER = "data-platform"
-UPSTREAM_DAG_ID = "rns_silver_etl"
 
-# Spark submit command with all required configurations
 # Spark submit command with Airflow interval dates passed as arguments
 # Supports manual backfill via DAG params: start_date and end_date
+# If params provided → use them (backfill mode)
+# If not provided → use Airflow's data_interval_start/end (normal mode)
 SPARK_SUBMIT_CMD = """
 docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
   --master 'local[2]' \
   --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
   --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
-  /opt/spark-jobs/gold_etl.py \
+  /opt/spark-jobs/silver_elt.py \
   --interval-start '{{ params.start_date if params.start_date else data_interval_start.isoformat() }}' \
   --interval-end '{{ params.end_date if params.end_date else data_interval_end.isoformat() }}'
 """
@@ -69,9 +85,9 @@ default_args = {
     "depends_on_past": False,
     "email_on_failure": False,
     "email_on_retry": False,
-    "retries": 1,                             # Demo: 1 (fast fail) | Prod: 3
-    "retry_delay": timedelta(minutes=1),      # Demo: 1 min | Prod: 10 min + exponential
-    "execution_timeout": timedelta(minutes=15),  # Demo: 15 min | Prod: 1-2 hours
+    "retries": 1,                            # Demo: 1 (fast fail) | Prod: 3
+    "retry_delay": timedelta(minutes=1),     # Demo: 1 min | Prod: 5 min + exponential
+    "execution_timeout": timedelta(minutes=10),  # Demo: 10 min | Prod: 30-60 min
 }
 
 # =============================================================================
@@ -79,19 +95,19 @@ default_args = {
 # =============================================================================
 # default_args = {
 #     "owner": OWNER,
-#     "depends_on_past": True,               # Strict ordering for aggregations
+#     "depends_on_past": True,               # Strict ordering
 #     "wait_for_downstream": True,           # Wait for downstream in previous run
 #     "email_on_failure": True,
 #     "email_on_retry": False,
-#     "email": ["data-platform@company.com", "analytics@company.com"],
+#     "email": ["data-platform@company.com"],
 #     "retries": 3,
-#     "retry_delay": timedelta(minutes=10),
-#     "retry_exponential_backoff": True,     # 10 → 20 → 40 min
-#     "max_retry_delay": timedelta(hours=1),
-#     "execution_timeout": timedelta(hours=2),
-#     "sla": timedelta(hours=1),             # Alert if daily job > 1 hour
-#     "pool": "spark_pool",                  # Shared pool with Silver
-#     "priority_weight": 20,                 # Higher than Silver (10)
+#     "retry_delay": timedelta(minutes=5),
+#     "retry_exponential_backoff": True,     # 5 → 10 → 20 min
+#     "max_retry_delay": timedelta(minutes=30),
+#     "execution_timeout": timedelta(hours=1),
+#     "sla": timedelta(minutes=45),          # Alert if task takes > 45 min
+#     "pool": "spark_pool",                  # Limit concurrent Spark jobs
+#     "priority_weight": 10,                 # Higher = more important
 # }
 
 
@@ -109,26 +125,25 @@ def on_failure_callback(context):
     """
     Log task failure.
     
-    Production Enhancement (Gold is business-critical):
+    Production Enhancement:
     ```python
     from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
     from airflow.providers.pagerduty.operators.pagerduty import PagerdutyEventsOperator
     
-    # Slack notification (data-alerts + analytics channel)
+    # Slack notification
     SlackWebhookOperator(
         task_id='slack_alert',
         slack_webhook_conn_id='slack_data_alerts',
-        message=f":rotating_light: *GOLD ETL FAILED* - {task_id}\\n"
-                f"Business dashboards may show stale data!",
+        message=f":x: *{dag_id}/{task_id}* failed at {execution_date}",
     ).execute(context)
     
-    # PagerDuty for immediate attention (Gold is business-critical)
+    # PagerDuty for critical pipelines
     PagerdutyEventsOperator(
         task_id='pagerduty_alert',
         pagerduty_events_conn_id='pagerduty',
-        routing_key='gold_etl_routing_key',
-        summary=f"Gold ETL failed: {task_id} - Analytics impacted",
-        severity='critical',  # Higher severity than Silver
+        routing_key='silver_etl_routing_key',
+        summary=f"Silver ETL failed: {task_id}",
+        severity='error',
     ).execute(context)
     ```
     """
@@ -143,34 +158,34 @@ def on_failure_callback(context):
 
 with DAG(
     dag_id=DAG_ID,
-    description="Transform Silver to Gold layer using Spark for BI/Analytics",
-    schedule="0 1 * * *",  # Daily at 1:00 AM UTC
+    description="Transform Bronze to Silver layer using Spark",
+    schedule="@hourly",
     start_date=datetime(2024, 1, 1),
     catchup=False,
     max_active_runs=1,
     default_args=default_args,
-    tags=["rns", "gold", "etl", "spark", "iceberg", "analytics"],
+    tags=["rns", "silver", "elt", "spark", "iceberg"],
     on_success_callback=on_success_callback,
     on_failure_callback=on_failure_callback,
     # Backfill params - trigger with these to override interval dates
     params={
         "start_date": None,  # ISO format: '2025-01-01T00:00:00'
-        "end_date": None,    # ISO format: '2025-01-02T00:00:00'
+        "end_date": None,    # ISO format: '2025-01-01T12:00:00'
     },
     doc_md="""
-    ## Gold ETL DAG
+    ## Silver ELT DAG
     
-    Aggregates Silver layer data to Gold layer for analytics.
+    Transforms Bronze layer data to Silver layer.
     
     ### Normal Execution
-    Runs daily at 1:00 AM UTC, processes previous day's Silver data.
+    Runs hourly, processes data from `data_interval_start` to `data_interval_end`.
     
     ### Backfill Mode
     Trigger with params to process a custom date range:
     ```json
     {
         "start_date": "2025-01-01T00:00:00",
-        "end_date": "2025-01-08T00:00:00"
+        "end_date": "2025-01-02T00:00:00"
     }
     ```
     """,
@@ -183,7 +198,7 @@ with DAG(
     def log_start(**context):
         execution_date = context.get("execution_date") or context.get("logical_date")
         print("=" * 60)
-        print("Gold Layer ETL - Starting")
+        print("Silver Layer ELT - Starting")
         print("=" * 60)
         print(f"Execution Date: {execution_date}")
         print(f"DAG Run ID: {context.get('dag_run').run_id if context.get('dag_run') else 'N/A'}")
@@ -196,42 +211,24 @@ with DAG(
     )
     
     # =========================================================================
-    # Sensor: Wait for Silver ETL (Optional - for hourly Silver dependency)
-    # =========================================================================
-    # Note: Commented out for manual testing. Enable in production.
-    # 
-    # wait_for_silver = ExternalTaskSensor(
-    #     task_id="wait_for_silver_etl",
-    #     external_dag_id=UPSTREAM_DAG_ID,
-    #     external_task_id="log_complete",
-    #     allowed_states=["success"],
-    #     execution_delta=timedelta(hours=1),  # Look for Silver run from 1 hour ago
-    #     mode="reschedule",  # Don't block worker
-    #     timeout=3600,  # 1 hour timeout
-    #     poke_interval=300,  # Check every 5 minutes
-    # )
-    
-    # =========================================================================
-    # Task: Run Gold ETL Spark Job
+    # Task: Run Silver ETL Spark Job
     # =========================================================================
     
-    run_gold_etl = BashOperator(
-        task_id="run_gold_etl_spark_job",
+    run_silver_elt = BashOperator(
+        task_id="run_silver_elt_spark_job",
         bash_command=SPARK_SUBMIT_CMD,
         doc_md="""
-        Runs the Gold ETL Spark job which:
-        1. Reads from Silver layer:
+        Runs the Silver ELT Spark job which:
+        1. Reads from Bronze layer (lakehouse.bronze.raw_conversion_events)
+        2. Cleans and validates data
+        3. Writes to Silver layer:
            - lakehouse.silver.fact_conversions
            - lakehouse.silver.dim_users
-        2. Builds analytics-ready Gold tables:
-           - lakehouse.gold.daily_conversion_summary
-           - lakehouse.gold.user_metrics
-           - lakehouse.gold.popular_numbers
         """,
     )
     
     # =========================================================================
-    # Task: Verify Gold Data
+    # Task: Verify Silver Data
     # =========================================================================
     
     verify_cmd = """
@@ -249,41 +246,13 @@ with DAG(
       --conf "spark.sql.catalog.lakehouse.s3.path-style-access=true" \
       --conf "spark.sql.catalog.lakehouse.client.region=us-east-1" \
       --conf "spark.sql.defaultCatalog=lakehouse" \
-      -e "println(\\"=== Gold Layer Tables ===\\"); spark.sql(\\"SELECT 'daily_conversion_summary' as tbl, COUNT(*) as cnt FROM lakehouse.gold.daily_conversion_summary UNION ALL SELECT 'user_metrics', COUNT(*) FROM lakehouse.gold.user_metrics UNION ALL SELECT 'popular_numbers', COUNT(*) FROM lakehouse.gold.popular_numbers\\").show(); System.exit(0)" 2>&1 | tail -15
+      -e "spark.sql(\\"SELECT 'fact_conversions' as table_name, COUNT(*) as row_count FROM lakehouse.silver.fact_conversions\\").show(); spark.sql(\\"SELECT 'dim_users' as table_name, COUNT(*) as row_count FROM lakehouse.silver.dim_users\\").show(); System.exit(0)" 2>&1 | tail -20
     """
     
-    verify_gold = BashOperator(
-        task_id="verify_gold_data",
+    verify_silver = BashOperator(
+        task_id="verify_silver_data",
         bash_command=verify_cmd,
-        doc_md="Verifies Gold layer tables have data after ETL.",
-    )
-    
-    # =========================================================================
-    # Task: Show Popular Numbers (for quick verification)
-    # =========================================================================
-    
-    show_popular_cmd = """
-    docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-shell \
-      --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
-      --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
-      --conf "spark.sql.catalog.lakehouse=org.apache.iceberg.spark.SparkCatalog" \
-      --conf "spark.sql.catalog.lakehouse.type=rest" \
-      --conf "spark.sql.catalog.lakehouse.uri=http://iceberg-rest:8181" \
-      --conf "spark.sql.catalog.lakehouse.warehouse=s3://lakehouse/warehouse" \
-      --conf "spark.sql.catalog.lakehouse.io-impl=org.apache.iceberg.aws.s3.S3FileIO" \
-      --conf "spark.sql.catalog.lakehouse.s3.endpoint=http://minio:9000" \
-      --conf "spark.sql.catalog.lakehouse.s3.access-key-id=minioadmin" \
-      --conf "spark.sql.catalog.lakehouse.s3.secret-access-key=minioadmin123" \
-      --conf "spark.sql.catalog.lakehouse.s3.path-style-access=true" \
-      --conf "spark.sql.catalog.lakehouse.client.region=us-east-1" \
-      --conf "spark.sql.defaultCatalog=lakehouse" \
-      -e "println(\\"Top 10 Most Popular Roman Numeral Conversions:\\"); spark.sql(\\"SELECT input_number, output_roman, request_count FROM lakehouse.gold.popular_numbers ORDER BY request_count DESC LIMIT 10\\").show(false); System.exit(0)" 2>&1 | tail -20
-    """
-    
-    show_popular = BashOperator(
-        task_id="show_popular_numbers",
-        bash_command=show_popular_cmd,
-        doc_md="Displays top 10 most popular Roman numeral conversions.",
+        doc_md="Verifies Silver layer tables have data after ELT.",
     )
     
     # =========================================================================
@@ -293,13 +262,12 @@ with DAG(
     def log_complete(**context):
         execution_date = context.get("execution_date") or context.get("logical_date")
         print("=" * 60)
-        print("Gold Layer ETL - Completed Successfully!")
+        print("Silver Layer ELT - Completed Successfully!")
         print("=" * 60)
         print(f"Execution Date: {execution_date}")
         print("Tables Updated:")
-        print("  - lakehouse.gold.daily_conversion_summary")
-        print("  - lakehouse.gold.user_metrics")
-        print("  - lakehouse.gold.popular_numbers")
+        print("  - lakehouse.silver.fact_conversions")
+        print("  - lakehouse.silver.dim_users")
         print("=" * 60)
     
     complete_task = PythonOperator(
@@ -313,4 +281,4 @@ with DAG(
     # DAG Flow
     # =========================================================================
     
-    start_task >> run_gold_etl >> verify_gold >> show_popular >> complete_task
+    start_task >> run_silver_elt >> verify_silver >> complete_task

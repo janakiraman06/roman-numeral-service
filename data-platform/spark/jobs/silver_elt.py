@@ -1,7 +1,22 @@
 """
-Silver Layer ETL: Bronze → Silver
+Silver Layer ELT: Bronze → Silver
 ==================================
 Transforms raw Bronze events into cleansed Silver tables.
+
+## Architecture Note: Combined Fact + Dimension Pipeline
+--------------------------------------------------------
+This job processes both fact_conversions and dim_users in a single pipeline.
+
+- Demo: Combined for simplicity and faster iteration
+- Production: Consider separate jobs per table for:
+  - Independent SLAs (dims often need to be ready before facts)
+  - Independent retries (dim failure shouldn't block fact)
+  - Reusability (dim_users may feed multiple fact tables)
+
+## Why ELT (not ETL)?
+---------------------
+Data is first Loaded to Bronze (raw), then Transformed in-place within
+the lakehouse. This is the modern Medallion architecture pattern.
 
 Transformations:
 - Deduplication by event_id (keep latest)
@@ -14,12 +29,12 @@ Tables Created:
 - silver.dim_users: User dimension (SCD Type 2)
 
 Usage (with Airflow interval dates):
-    spark-submit silver_etl.py \
+    spark-submit silver_elt.py \
         --interval-start '2025-01-01T00:00:00' \
         --interval-end '2025-01-01T01:00:00'
 
 Usage (full load - no arguments):
-    spark-submit silver_etl.py
+    spark-submit silver_elt.py
 """
 
 import argparse
@@ -34,7 +49,7 @@ from pyspark.sql.window import Window
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Silver ETL Job")
+    parser = argparse.ArgumentParser(description="Silver ELT Job")
     parser.add_argument(
         "--interval-start",
         type=str,
@@ -53,7 +68,7 @@ def parse_args():
 def create_spark_session():
     """Create Spark session with Iceberg REST catalog support."""
     return (SparkSession.builder
-        .appName("SilverETL")
+        .appName("SilverELT")
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
         # Iceberg REST Catalog configuration
         .config("spark.sql.catalog.lakehouse", "org.apache.iceberg.spark.SparkCatalog")
@@ -240,7 +255,7 @@ def main():
     args = parse_args()
     
     print("=" * 60)
-    print("Silver Layer ETL: Bronze → Silver")
+    print("Silver Layer ELT: Bronze → Silver")
     print("=" * 60)
     
     if args.interval_start and args.interval_end:
@@ -265,7 +280,7 @@ def main():
     dim_count = update_dim_users(spark)
     
     print("\n" + "=" * 60)
-    print("✅ Silver ETL Complete!")
+    print("✅ Silver ELT Complete!")
     print(f"   fact_conversions: {fact_count} records")
     print(f"   dim_users: {dim_count} records")
     print("=" * 60)

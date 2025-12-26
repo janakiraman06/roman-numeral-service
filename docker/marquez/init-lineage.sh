@@ -77,15 +77,15 @@ send_lineage_event "bronze-ingestion" "${NAMESPACE}" \
   '[{"namespace": "kafka", "name": "roman-numeral-events"}]' \
   '[{"namespace": "iceberg", "name": "bronze.raw_conversion_events"}]'
 
-# Silver ETL: Bronze → Silver
-echo "  → Silver ETL (Bronze → Silver)"
-send_lineage_event "silver-etl" "${NAMESPACE}" \
+# Silver ELT: Bronze → Silver
+echo "  → Silver ELT (Bronze → Silver)"
+send_lineage_event "silver-elt" "${NAMESPACE}" \
   '[{"namespace": "iceberg", "name": "bronze.raw_conversion_events"}]' \
   '[{"namespace": "iceberg", "name": "silver.fact_conversions"}, {"namespace": "iceberg", "name": "silver.dim_users"}]'
 
-# Gold ETL: Silver → Gold
-echo "  → Gold ETL (Silver → Gold)"
-send_lineage_event "gold-etl" "${NAMESPACE}" \
+# Gold ELT: Silver → Gold
+echo "  → Gold ELT (Silver → Gold)"
+send_lineage_event "gold-elt" "${NAMESPACE}" \
   '[{"namespace": "iceberg", "name": "silver.fact_conversions"}, {"namespace": "iceberg", "name": "silver.dim_users"}]' \
   '[{"namespace": "iceberg", "name": "gold.daily_conversion_summary"}, {"namespace": "iceberg", "name": "gold.user_metrics"}, {"namespace": "iceberg", "name": "gold.popular_numbers"}]'
 

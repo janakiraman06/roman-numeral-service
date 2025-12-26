@@ -1,7 +1,12 @@
 """
-Gold Layer ETL: Silver → Gold
+Gold Layer ELT: Silver → Gold
 ==============================
 Aggregates Silver data into analytics-ready Gold tables.
+
+## Why ELT (not ETL)?
+---------------------
+Data is first Loaded to Bronze (raw), then Transformed in-place within
+the lakehouse. This is the modern Medallion architecture pattern.
 
 Tables Created:
 - gold.daily_conversion_summary: Daily metrics
@@ -9,12 +14,12 @@ Tables Created:
 - gold.popular_numbers: Most popular conversions
 
 Usage (with Airflow interval dates):
-    spark-submit gold_etl.py \
+    spark-submit gold_elt.py \
         --interval-start '2025-01-01T00:00:00' \
         --interval-end '2025-01-02T00:00:00'
 
 Usage (full load - no arguments):
-    spark-submit gold_etl.py
+    spark-submit gold_elt.py
 """
 
 import argparse
@@ -28,7 +33,7 @@ from pyspark.sql.functions import (
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Gold ETL Job")
+    parser = argparse.ArgumentParser(description="Gold ELT Job")
     parser.add_argument(
         "--interval-start",
         type=str,
@@ -47,7 +52,7 @@ def parse_args():
 def create_spark_session():
     """Create Spark session with Iceberg support."""
     return (SparkSession.builder
-        .appName("GoldETL")
+        .appName("GoldELT")
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
         # Iceberg REST Catalog configuration
         .config("spark.sql.catalog.lakehouse", "org.apache.iceberg.spark.SparkCatalog")
@@ -312,7 +317,7 @@ def main():
     args = parse_args()
     
     print("=" * 60)
-    print("Gold Layer ETL: Silver → Gold")
+    print("Gold Layer ELT: Silver → Gold")
     print("=" * 60)
     
     if args.interval_start and args.interval_end:
@@ -340,7 +345,7 @@ def main():
     popular_count = build_popular_numbers(spark)  # Always full recalc for rankings
     
     print("\n" + "=" * 60)
-    print("✅ Gold ETL Complete!")
+    print("✅ Gold ELT Complete!")
     print(f"   daily_conversion_summary: {daily_count} records")
     print(f"   user_metrics: {user_count} records")
     print(f"   popular_numbers: {popular_count} records")

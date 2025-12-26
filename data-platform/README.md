@@ -70,10 +70,14 @@ data-platform/
 │   ├── conf/
 │   │   └── spark-defaults.conf        # Spark configuration for Iceberg/S3
 │   └── jobs/
-│       ├── silver_etl.py              # Bronze → Silver transformations
-│       └── gold_etl.py                # Silver → Gold aggregations
-├── airflow/                           # (Coming soon) DAG definitions
-└── notebooks/                         # (Coming soon) Jupyter analysis
+│       ├── silver_elt.py              # Bronze → Silver transformations
+│       └── gold_elt.py                # Silver → Gold aggregations
+├── airflow/
+│   └── dags/
+│       ├── rns_bronze_ingestion.py    # Kafka → Bronze (Spark batch)
+│       ├── rns_silver_elt.py          # Bronze → Silver ELT
+│       └── rns_gold_elt.py            # Silver → Gold ELT
+└── notebooks/                         # Jupyter analysis notebooks
 ```
 
 ## Data Engineering Standards
@@ -153,18 +157,18 @@ flink savepoint <job-id> s3://lakehouse/flink/savepoints
 # Manual execution for testing
 docker exec -it spark-master bash
 
-# Run Silver ETL
+# Run Silver ELT
 spark-submit \
   --master spark://spark-master:7077 \
   --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.2,\
 org.apache.hadoop:hadoop-aws:3.3.4 \
-  /opt/spark-jobs/silver_etl.py \
+  /opt/spark-jobs/silver_elt.py \
   --date 2024-12-25
 
-# Run Gold ETL
+# Run Gold ELT
 spark-submit \
   --master spark://spark-master:7077 \
-  /opt/spark-jobs/gold_etl.py \
+  /opt/spark-jobs/gold_elt.py \
   --date 2024-12-25
 ```
 
@@ -193,6 +197,21 @@ spark-submit \
 - Pre-aggregated metrics
 - Optimized for analytics queries
 - Daily refresh
+
+## Data Lineage (Marquez)
+
+**Demo:** Lineage is seeded via `docker/marquez/init-lineage.sh` on startup.
+
+**Production:** Use [OpenLineage](https://openlineage.io) integrations:
+- Spark: Add `openlineage-spark` JAR with `OpenLineageSparkListener`
+- Airflow: Install `apache-airflow-providers-openlineage`
+
+> **Note:** `airflow/dags/common/openlineage_config.py` provides utilities for
+> production integration but is not actively used in this demo.
+
+### Viewing Lineage
+- **Marquez UI**: http://localhost:3001
+- **Namespace**: `rns-data-platform`
 
 ## Monitoring
 
