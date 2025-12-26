@@ -332,6 +332,12 @@ services:
         chmod +x /usr/local/bin/docker &&
         rm -rf /tmp/docker /tmp/docker.tgz &&
         echo 'Docker CLI installed:' && docker --version &&
+        echo 'Waiting for Airflow DB to be ready...' &&
+        until airflow db check 2>/dev/null; do
+          echo 'DB not ready, retrying in 5s...'
+          sleep 5
+        done &&
+        echo 'DB ready, initializing...' &&
         airflow db init &&
         airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
         airflow webserver & airflow scheduler

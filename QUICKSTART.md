@@ -66,7 +66,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}" | head -20
 # - Marquez:    http://localhost:3001
 ```
 
-> **Important:** Airflow takes 2-3 minutes to fully initialize. If the UI shows errors, wait and refresh.
+> **Important:** Airflow takes 2-3 minutes to fully initialize on first start (DB setup + Docker CLI install).  
+> Check progress: `docker compose logs -f airflow` - look for "DB ready, initializing..."
 
 ---
 
