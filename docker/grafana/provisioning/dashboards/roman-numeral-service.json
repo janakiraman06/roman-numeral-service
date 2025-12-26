@@ -1186,7 +1186,7 @@
       },
       "targets": [
         {
-          "expr": "{container_name=\"roman-numeral-service\"} |= ``",
+          "expr": "{job=\"docker\"} |~ \"http.request|RomanNumeral|romannumeral\"",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1216,7 +1216,7 @@
           "gridPos": {"h": 4, "w": 6, "x": 0, "y": 70},
           "id": 201,
           "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}},
-          "targets": [{"expr": "sum(api_key_validation_total{result=\"success\"})", "legendFormat": "Success", "refId": "A"}],
+          "targets": [{"expr": "sum(api_key_validation_success_total)", "legendFormat": "Success", "refId": "A"}],
           "title": "✅ API Key Validations (Success)",
           "type": "stat"
         },
@@ -1239,7 +1239,7 @@
           "gridPos": {"h": 4, "w": 6, "x": 6, "y": 70},
           "id": 202,
           "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}},
-          "targets": [{"expr": "sum(api_key_validation_total{result=\"failure\"})", "legendFormat": "Failure", "refId": "A"}],
+          "targets": [{"expr": "sum(api_key_validation_failure_total)", "legendFormat": "Failure", "refId": "A"}],
           "title": "❌ API Key Validations (Failed)",
           "type": "stat"
         },
@@ -1257,8 +1257,8 @@
           "id": 203,
           "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
           "targets": [
-            {"expr": "rate(api_key_validation_total{result=\"success\"}[5m])", "legendFormat": "Success/s", "refId": "A"},
-            {"expr": "rate(api_key_validation_total{result=\"failure\"}[5m])", "legendFormat": "Failure/s", "refId": "B"}
+            {"expr": "rate(api_key_validation_success_total[5m])", "legendFormat": "Success/s", "refId": "A"},
+            {"expr": "rate(api_key_validation_failure_total[5m])", "legendFormat": "Failure/s", "refId": "B"}
           ],
           "title": "🔑 API Key Validation Rate",
           "type": "timeseries"
@@ -1289,7 +1289,7 @@
           "gridPos": {"h": 4, "w": 6, "x": 0, "y": 71},
           "id": 301,
           "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}},
-          "targets": [{"expr": "sum(kafka_message_sent_total{result=\"success\"})", "legendFormat": "Success", "refId": "A"}],
+          "targets": [{"expr": "sum(kafka_events_published_total{status=\"success\"})", "legendFormat": "Success", "refId": "A"}],
           "title": "✅ Kafka Messages Sent (Success)",
           "type": "stat"
         },
@@ -1312,7 +1312,7 @@
           "gridPos": {"h": 4, "w": 6, "x": 6, "y": 71},
           "id": 302,
           "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}},
-          "targets": [{"expr": "sum(kafka_message_sent_total{result=\"failure\"})", "legendFormat": "Failure", "refId": "A"}],
+          "targets": [{"expr": "sum(kafka_events_published_total{status=\"failure\"})", "legendFormat": "Failure", "refId": "A"}],
           "title": "❌ Kafka Messages Failed",
           "type": "stat"
         },
@@ -1330,8 +1330,8 @@
           "id": 303,
           "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
           "targets": [
-            {"expr": "rate(kafka_message_sent_total{result=\"success\"}[5m])", "legendFormat": "Success/s", "refId": "A"},
-            {"expr": "rate(kafka_message_sent_total{result=\"failure\"}[5m])", "legendFormat": "Failure/s", "refId": "B"}
+            {"expr": "rate(kafka_events_published_total{status=\"success\"}[5m])", "legendFormat": "Success/s", "refId": "A"},
+            {"expr": "rate(kafka_events_published_total{status=\"failure\"}[5m])", "legendFormat": "Failure/s", "refId": "B"}
           ],
           "title": "📨 Kafka Message Rate",
           "type": "timeseries"

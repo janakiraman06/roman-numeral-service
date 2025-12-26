@@ -45,13 +45,25 @@
         </encoder>
     </appender>
 
-    <!-- ===== Default Profile (Development) ===== -->
+    <!-- ===== Default Profile (Local Development without Docker) ===== -->
     <springProfile name="default">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
         </root>
         
         <logger name="com.adobe.romannumeral" level="DEBUG"/>
+        <logger name="http.request" level="INFO"/>
+        <logger name="org.springframework.web" level="INFO"/>
+    </springProfile>
+
+    <!-- ===== Dev Profile (Docker Development) ===== -->
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        
+        <logger name="com.adobe.romannumeral" level="DEBUG"/>
+        <logger name="http.request" level="INFO"/>
         <logger name="org.springframework.web" level="INFO"/>
     </springProfile>
 
@@ -62,6 +74,7 @@
         </root>
         
         <logger name="com.adobe.romannumeral" level="INFO"/>
+        <logger name="http.request" level="INFO"/>
         <logger name="org.springframework.web" level="WARN"/>
         <logger name="org.springframework.security" level="WARN"/>
     </springProfile>
