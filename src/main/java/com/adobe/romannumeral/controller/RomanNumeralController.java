@@ -4,6 +4,7 @@ import com.adobe.romannumeral.exception.InvalidInputException;
 import com.adobe.romannumeral.model.ConversionResult;
 import com.adobe.romannumeral.model.PagedRangeResult;
 import com.adobe.romannumeral.model.RangeConversionResult;
+import com.adobe.romannumeral.service.KafkaProducerService;
 import com.adobe.romannumeral.service.ParallelRangeProcessor;
 import com.adobe.romannumeral.service.RomanNumeralService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,15 +14,18 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -54,14 +58,25 @@ public class RomanNumeralController {
     private static final String CORRELATION_ID = "correlationId";
 
     private final RomanNumeralService romanNumeralService;
+    private final Optional<KafkaProducerService> kafkaProducerService;
 
     /**
-     * Constructs the controller with the required service.
+     * Constructs the controller with the required services.
      * 
      * @param romanNumeralService the service for Roman numeral conversions
+     * @param kafkaProducerService optional Kafka producer (only present when app.kafka.enabled=true)
      */
-    public RomanNumeralController(RomanNumeralService romanNumeralService) {
+    public RomanNumeralController(
+            RomanNumeralService romanNumeralService,
+            @Autowired(required = false) KafkaProducerService kafkaProducerService) {
         this.romanNumeralService = romanNumeralService;
+        this.kafkaProducerService = Optional.ofNullable(kafkaProducerService);
+        
+        if (this.kafkaProducerService.isPresent()) {
+            logger.info("KafkaProducerService injected - events will be published to Kafka");
+        } else {
+            logger.info("KafkaProducerService not available - Kafka publishing disabled");
+        }
     }
 
     /**
@@ -117,18 +132,24 @@ public class RomanNumeralController {
             @RequestParam(required = false) Integer offset,
             
             @Parameter(description = "Maximum items per page (default: 100, max: 500)")
-            @RequestParam(required = false) Integer limit) {
+            @RequestParam(required = false) Integer limit,
+            
+            HttpServletRequest request) {
         
         // Generate correlation ID for request tracing
         String correlationId = UUID.randomUUID().toString().substring(0, 8);
         MDC.put(CORRELATION_ID, correlationId);
         
+        // Track timing for Kafka event
+        long startTime = System.nanoTime();
+        String clientIp = getClientIp(request);
+        
         try {
             // Determine which type of request this is
             if (isRangeQuery(min, max)) {
-                return handleRangeConversion(min, max, offset, limit);
+                return handleRangeConversion(min, max, offset, limit, correlationId, clientIp, startTime);
             } else if (query != null) {
-                return handleSingleConversion(query);
+                return handleSingleConversion(query, correlationId, clientIp, startTime);
             } else {
                 throw new InvalidInputException(
                     "Missing required parameter. Provide 'query' for single conversion, " +
@@ -143,12 +164,30 @@ public class RomanNumeralController {
      * Handles single integer conversion.
      * 
      * @param query the integer to convert
+     * @param correlationId request correlation ID
+     * @param clientIp client IP address
+     * @param startTime request start time in nanos
      * @return ResponseEntity with ConversionResult
      */
-    private ResponseEntity<ConversionResult> handleSingleConversion(int query) {
+    private ResponseEntity<ConversionResult> handleSingleConversion(
+            int query, String correlationId, String clientIp, long startTime) {
         logger.info("Processing single conversion request for: {}", query);
         
         ConversionResult result = romanNumeralService.convertSingle(query);
+        
+        // Publish event to Kafka
+        long responseTimeNanos = System.nanoTime() - startTime;
+        kafkaProducerService.ifPresent(kafka -> 
+            kafka.publishSingleConversion(
+                query, 
+                result.output(), 
+                responseTimeNanos, 
+                correlationId, 
+                clientIp, 
+                null,  // userId - would come from auth context
+                null   // apiKeyPrefix - would come from auth context
+            )
+        );
         
         logger.info("Successfully converted {} to {}", result.input(), result.output());
         return ResponseEntity.ok(result);
@@ -164,9 +203,14 @@ public class RomanNumeralController {
      * @param max the maximum value (inclusive)
      * @param offset starting position (0-based), null for full range
      * @param limit maximum items per page, null for full range
+     * @param correlationId request correlation ID
+     * @param clientIp client IP address
+     * @param startTime request start time in nanos
      * @return ResponseEntity with RangeConversionResult or PagedRangeResult
      */
-    private ResponseEntity<?> handleRangeConversion(Integer min, Integer max, Integer offset, Integer limit) {
+    private ResponseEntity<?> handleRangeConversion(
+            Integer min, Integer max, Integer offset, Integer limit,
+            String correlationId, String clientIp, long startTime) {
         // Validate that both parameters are present
         if (min == null || max == null) {
             throw new InvalidInputException(
@@ -193,6 +237,15 @@ public class RomanNumeralController {
             PagedRangeResult result = romanNumeralService.convertRangePaginated(
                 min, max, effectiveOffset, effectiveLimit);
             
+            // Publish event to Kafka
+            long responseTimeNanos = System.nanoTime() - startTime;
+            kafkaProducerService.ifPresent(kafka -> 
+                kafka.publishRangeConversion(
+                    min, max, result.size(), effectiveOffset, effectiveLimit,
+                    responseTimeNanos, correlationId, clientIp, null, null
+                )
+            );
+            
             logger.info("Successfully converted page {}/{} of range [{}-{}]: {} conversions",
                 result.pagination().currentPage(),
                 result.pagination().totalPages(),
@@ -203,6 +256,15 @@ public class RomanNumeralController {
             logger.info("Processing range conversion request: min={}, max={}", min, max);
             
             RangeConversionResult result = romanNumeralService.convertRange(min, max);
+            
+            // Publish event to Kafka
+            long responseTimeNanos = System.nanoTime() - startTime;
+            kafkaProducerService.ifPresent(kafka -> 
+                kafka.publishRangeConversion(
+                    min, max, result.size(), null, null,
+                    responseTimeNanos, correlationId, clientIp, null, null
+                )
+            );
             
             logger.info("Successfully converted range [{}-{}]: {} conversions", 
                 min, max, result.size());
@@ -219,6 +281,22 @@ public class RomanNumeralController {
      */
     private boolean isRangeQuery(Integer min, Integer max) {
         return min != null || max != null;
+    }
+
+    /**
+     * Extracts the client IP address from the request.
+     * Handles proxied requests by checking X-Forwarded-For header.
+     * 
+     * @param request the HTTP request
+     * @return the client IP address
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            // X-Forwarded-For can contain multiple IPs; the first is the client
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
 

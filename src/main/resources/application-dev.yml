@@ -19,8 +19,7 @@ app:
   
   kafka:
     enabled: true  # Enable Kafka for event streaming
-    topic:
-      conversion-events: roman-numeral-events
+    topic: roman-numeral-events  # Topic for conversion events
 
 # PostgreSQL database (provided by Docker Compose)
 # Connection settings are injected via environment variables
