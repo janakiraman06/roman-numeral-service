@@ -1,0 +1,156 @@
+{
+  "data_asset_type": null,
+  "expectation_suite_name": "silver_dim_users_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": {
+        "min_value": 0,
+        "max_value": null
+      },
+      "meta": {
+        "notes": "Dimension table can be empty if no users yet"
+      }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "user_id"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "valid_from"
+      },
+      "meta": {
+        "notes": "SCD Type 2 required column"
+      }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "valid_to"
+      },
+      "meta": {
+        "notes": "SCD Type 2 required column"
+      }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "is_current"
+      },
+      "meta": {
+        "notes": "SCD Type 2 required column"
+      }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "version"
+      },
+      "meta": {
+        "notes": "SCD Type 2 version tracking"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "user_id"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "valid_from"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "valid_to"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "is_current"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_of_type",
+      "kwargs": {
+        "column": "is_current",
+        "type_": "BooleanType"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "version",
+        "min_value": 1,
+        "max_value": null
+      },
+      "meta": {
+        "notes": "Version starts at 1 and increments"
+      }
+    },
+    {
+      "expectation_type": "expect_column_pair_values_A_to_be_greater_than_B",
+      "kwargs": {
+        "column_A": "valid_to",
+        "column_B": "valid_from",
+        "or_equal": true
+      },
+      "meta": {
+        "notes": "SCD Type 2 integrity: valid_to must be >= valid_from"
+      }
+    },
+    {
+      "expectation_type": "expect_compound_columns_to_be_unique",
+      "kwargs": {
+        "column_list": ["user_id", "version"]
+      },
+      "meta": {
+        "notes": "Each user_id + version combination must be unique"
+      }
+    }
+  ],
+  "ge_cloud_id": null,
+  "meta": {
+    "great_expectations_version": "0.18.0",
+    "citations": [
+      {
+        "citation_date": "2024-01-01",
+        "comment": "Initial expectation suite for Silver dim_users SCD Type 2 table"
+      }
+    ],
+    "notes": {
+      "format": "markdown",
+      "content": [
+        "# Silver Layer: dim_users (SCD Type 2)",
+        "",
+        "## Purpose",
+        "Validates the integrity of the SCD Type 2 user dimension.",
+        "",
+        "## SCD Type 2 Validations",
+        "- **valid_from/valid_to**: No gaps or overlaps in time ranges",
+        "- **is_current**: Exactly one current version per user",
+        "- **version**: Monotonically increasing per user",
+        "",
+        "## Key Business Rules",
+        "1. Every user must have exactly one `is_current = TRUE` record",
+        "2. `valid_to >= valid_from` for all records",
+        "3. Historical records have `valid_to < '9999-12-31'`"
+      ]
+    }
+  }
+}
+

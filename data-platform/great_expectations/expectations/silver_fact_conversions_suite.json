@@ -1,0 +1,174 @@
+{
+  "data_asset_type": null,
+  "expectation_suite_name": "silver_fact_conversions_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": {
+        "min_value": 1,
+        "max_value": null
+      },
+      "meta": {
+        "notes": "Silver fact table should have at least 1 row after ETL"
+      }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "event_id"
+      },
+      "meta": {
+        "notes": "Primary key column must exist"
+      }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "event_timestamp"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "conversion_type"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "status"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "event_id"
+      },
+      "meta": {
+        "notes": "Primary key cannot be null"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_unique",
+      "kwargs": {
+        "column": "event_id"
+      },
+      "meta": {
+        "notes": "Primary key must be unique (deduplication check)"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "event_timestamp"
+      },
+      "meta": {
+        "notes": "Event timestamp is required for time-series analysis"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "conversion_type"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "conversion_type",
+        "value_set": ["single", "range", "error"]
+      },
+      "meta": {
+        "notes": "Only valid conversion types allowed"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "status",
+        "value_set": ["SUCCESS", "ERROR", "UNKNOWN"]
+      },
+      "meta": {
+        "notes": "Derived status must be one of expected values"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "input_value",
+        "min_value": 1,
+        "max_value": 3999,
+        "mostly": 0.99
+      },
+      "meta": {
+        "notes": "Input values should be in valid Roman numeral range (1-3999). 99% threshold allows for error records."
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_match_regex",
+      "kwargs": {
+        "column": "output_value",
+        "regex": "^[MDCLXVI]+$",
+        "mostly": 0.95
+      },
+      "meta": {
+        "notes": "Output should contain only valid Roman numeral characters. 95% threshold allows for nulls on range/error types."
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "conversion_count",
+        "min_value": 1,
+        "max_value": 3999
+      },
+      "meta": {
+        "notes": "Conversion count must be positive and within range limits"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_of_type",
+      "kwargs": {
+        "column": "is_late_arrival",
+        "type_": "BooleanType"
+      },
+      "meta": {
+        "notes": "Late arrival flag must be boolean"
+      }
+    }
+  ],
+  "ge_cloud_id": null,
+  "meta": {
+    "great_expectations_version": "0.18.0",
+    "citations": [
+      {
+        "citation_date": "2024-01-01",
+        "comment": "Initial expectation suite for Silver fact_conversions table"
+      }
+    ],
+    "notes": {
+      "format": "markdown",
+      "content": [
+        "# Silver Layer: fact_conversions",
+        "",
+        "## Purpose",
+        "Validates the quality of the Silver fact_conversions table after Bronze-to-Silver ETL.",
+        "",
+        "## Key Validations",
+        "- **Uniqueness**: event_id must be unique (deduplication verification)",
+        "- **Completeness**: Required columns cannot be null",
+        "- **Validity**: Values must be within expected domains",
+        "- **Consistency**: Derived columns match business logic",
+        "",
+        "## When to Run",
+        "- After Silver ETL completes (hourly)",
+        "- Before Gold ETL starts (dependency check)"
+      ]
+    }
+  }
+}
+

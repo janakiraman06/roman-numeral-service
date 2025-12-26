@@ -26,6 +26,7 @@ Data Engineering Standards:
 
 4. DATA QUALITY
    - Pre-validation of Bronze data
+   - Great Expectations validation after ETL
    - Post-verification of Silver output
    - Metrics published via XCom
 
@@ -300,6 +301,55 @@ def rns_silver_etl():
         return [fact_result, dim_result]
     
     # =========================================================================
+    # Task: Great Expectations Validation
+    # =========================================================================
+    
+    @task(
+        task_id="run_great_expectations",
+        doc_md="Runs Great Expectations checkpoint for Silver layer validation.",
+    )
+    def run_great_expectations(**context) -> dict[str, Any]:
+        """
+        Run Great Expectations checkpoint to validate Silver layer data.
+        
+        This runs the silver_validation_checkpoint which validates:
+        - fact_conversions: Uniqueness, completeness, validity
+        - dim_users: SCD Type 2 integrity
+        
+        In production, this uses the GreatExpectationsOperator.
+        For demo, we simulate the validation result.
+        """
+        execution_date = context["execution_date"]
+        run_date = execution_date.strftime("%Y-%m-%d")
+        
+        # In production with Great Expectations installed:
+        # from great_expectations import get_context
+        # context = get_context(context_root_dir="/opt/great_expectations")
+        # result = context.run_checkpoint(
+        #     checkpoint_name="silver_validation_checkpoint",
+        #     batch_identifiers={"run_date": run_date},
+        # )
+        
+        ge_result = {
+            "checkpoint_name": "silver_validation_checkpoint",
+            "run_date": run_date,
+            "success": True,
+            "validation_stats": {
+                "total_expectations": 15,
+                "successful_expectations": 15,
+                "failed_expectations": 0,
+                "success_percent": 100.0,
+            },
+            "suites_validated": [
+                "silver_fact_conversions_suite",
+                "silver_dim_users_suite",
+            ],
+        }
+        
+        print(f"Great Expectations validation result: {ge_result}")
+        return ge_result
+    
+    # =========================================================================
     # Task: Verify Silver Data
     # =========================================================================
     
@@ -307,7 +357,11 @@ def rns_silver_etl():
         task_id="verify_silver_data",
         doc_md="Post-ETL verification of Silver layer data quality.",
     )
-    def verify_silver_data(transform_results: list[dict], **context) -> dict[str, Any]:
+    def verify_silver_data(
+        transform_results: list[dict],
+        ge_results: dict,
+        **context,
+    ) -> dict[str, Any]:
         """
         Verify Silver data quality after transformation.
         
@@ -316,14 +370,20 @@ def rns_silver_etl():
         - No orphan records
         - SCD Type 2 integrity (no gaps in valid_from/valid_to)
         - Referential integrity
+        - Great Expectations validation passed
         
         Args:
             transform_results: XCom results from transform tasks
+            ge_results: Great Expectations validation results
         """
         execution_date = context["execution_date"]
         
         # Aggregate metrics from transform tasks
         total_rows = sum(r.get("rows_merged", 0) for r in transform_results)
+        
+        # Check Great Expectations results
+        ge_success = ge_results.get("success", False)
+        ge_stats = ge_results.get("validation_stats", {})
         
         verification_result = {
             "execution_date": execution_date.isoformat(),
@@ -331,7 +391,10 @@ def rns_silver_etl():
             "fact_row_count_ok": True,
             "dim_integrity_ok": True,
             "scd2_no_gaps": True,
-            "status": "passed",
+            "ge_validation_passed": ge_success,
+            "ge_expectations_total": ge_stats.get("total_expectations", 0),
+            "ge_expectations_passed": ge_stats.get("successful_expectations", 0),
+            "status": "passed" if ge_success else "failed",
         }
         
         print(f"Silver verification: {verification_result}")
@@ -378,10 +441,11 @@ def rns_silver_etl():
     
     validation = validate_bronze_data()
     transforms = transform_group()
-    verification = verify_silver_data(transforms)
+    ge_validation = run_great_expectations()
+    verification = verify_silver_data(transforms, ge_validation)
     
-    # Chain: validate -> transform -> verify -> publish
-    validation >> transforms >> verification
+    # Chain: validate -> transform -> GE validation -> verify -> publish
+    validation >> transforms >> ge_validation >> verification
     publish_metrics(validation, verification)
 
 

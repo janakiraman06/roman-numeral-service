@@ -1,0 +1,124 @@
+# ============================================
+# Great Expectations Configuration
+# ============================================
+# Data quality validation for Roman Numeral Lakehouse
+#
+# This configuration defines:
+# - Data sources (Spark/Iceberg tables)
+# - Expectation stores (where expectations are saved)
+# - Validation result stores (where results are saved)
+# - Data Docs sites (HTML reports)
+#
+# Version: 1.0.0
+# ============================================
+
+config_version: 3.0
+
+# ============================================
+# Datasources
+# ============================================
+# Connect to Iceberg tables via Spark
+
+datasources:
+  lakehouse_spark:
+    class_name: Datasource
+    module_name: great_expectations.datasource
+    execution_engine:
+      class_name: SparkDFExecutionEngine
+      module_name: great_expectations.execution_engine
+      # Spark session will be provided by the runtime environment
+      # (Airflow SparkSubmitOperator or Jupyter notebook)
+    data_connectors:
+      # For querying Iceberg tables directly
+      iceberg_connector:
+        class_name: RuntimeDataConnector
+        module_name: great_expectations.datasource.data_connector
+        batch_identifiers:
+          - batch_id
+          - run_date
+
+# ============================================
+# Stores Configuration
+# ============================================
+# Where to store expectations, validation results, and checkpoints
+
+config_variables_file_path: uncommitted/config_variables.yml
+
+stores:
+  # Store expectation suites as JSON files
+  expectations_store:
+    class_name: ExpectationsStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: expectations/
+
+  # Store validation results as JSON files
+  validations_store:
+    class_name: ValidationsStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: uncommitted/validations/
+
+  # Store evaluation parameters
+  evaluation_parameter_store:
+    class_name: EvaluationParameterStore
+
+  # Store checkpoint configurations
+  checkpoint_store:
+    class_name: CheckpointStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: checkpoints/
+
+  # Store profiler configurations
+  profiler_store:
+    class_name: ProfilerStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: profilers/
+
+expectations_store_name: expectations_store
+validations_store_name: validations_store
+evaluation_parameter_store_name: evaluation_parameter_store
+checkpoint_store_name: checkpoint_store
+
+# ============================================
+# Data Docs Sites
+# ============================================
+# Generate HTML documentation for data quality results
+
+data_docs_sites:
+  # Local filesystem site (for development)
+  local_site:
+    class_name: SiteBuilder
+    show_how_to_buttons: true
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: uncommitted/data_docs/local_site/
+    site_index_builder:
+      class_name: DefaultSiteIndexBuilder
+
+  # S3/MinIO site (for production - shared access)
+  # Uncomment when MinIO is configured
+  # s3_site:
+  #   class_name: SiteBuilder
+  #   store_backend:
+  #     class_name: TupleS3StoreBackend
+  #     bucket: lakehouse
+  #     prefix: data_docs/
+  #     boto3_options:
+  #       endpoint_url: http://minio:9000
+  #   site_index_builder:
+  #     class_name: DefaultSiteIndexBuilder
+
+# ============================================
+# Plugins
+# ============================================
+plugins_directory: plugins/
+
+# ============================================
+# Anonymous Usage Statistics
+# ============================================
+anonymous_usage_statistics:
+  enabled: false
+

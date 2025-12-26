@@ -1,0 +1,141 @@
+{
+  "data_asset_type": null,
+  "expectation_suite_name": "bronze_conversion_events_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": {
+        "min_value": 0,
+        "max_value": null
+      },
+      "meta": {
+        "notes": "Bronze can be empty if no events yet"
+      }
+    },
+    {
+      "expectation_type": "expect_table_columns_to_match_set",
+      "kwargs": {
+        "column_set": [
+          "event_id",
+          "event_timestamp",
+          "user_id",
+          "api_key_id",
+          "client_ip",
+          "user_agent",
+          "conversion_type",
+          "input_value",
+          "output_value",
+          "min_range",
+          "max_range",
+          "range_results",
+          "error_type",
+          "error_message",
+          "ingested_at",
+          "is_late_arrival",
+          "event_date",
+          "year",
+          "month",
+          "day"
+        ],
+        "exact_match": false
+      },
+      "meta": {
+        "notes": "Schema validation - all expected columns present"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "event_id"
+      },
+      "meta": {
+        "notes": "Event ID is required for deduplication"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "event_timestamp"
+      },
+      "meta": {
+        "notes": "Timestamp required for event-time processing"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "ingested_at"
+      },
+      "meta": {
+        "notes": "Ingestion timestamp added by Flink"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "conversion_type",
+        "value_set": ["single", "range", "error"]
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_match_regex",
+      "kwargs": {
+        "column": "event_id",
+        "regex": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+      },
+      "meta": {
+        "notes": "Event ID should be a valid UUID format"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_match_regex",
+      "kwargs": {
+        "column": "client_ip",
+        "regex": "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$",
+        "mostly": 0.95
+      },
+      "meta": {
+        "notes": "Client IP should be valid IPv4 or IPv6. 95% threshold for edge cases."
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_of_type",
+      "kwargs": {
+        "column": "is_late_arrival",
+        "type_": "BooleanType"
+      },
+      "meta": {}
+    }
+  ],
+  "ge_cloud_id": null,
+  "meta": {
+    "great_expectations_version": "0.18.0",
+    "citations": [
+      {
+        "citation_date": "2024-01-01",
+        "comment": "Initial expectation suite for Bronze conversion_events_raw table"
+      }
+    ],
+    "notes": {
+      "format": "markdown",
+      "content": [
+        "# Bronze Layer: conversion_events_raw",
+        "",
+        "## Purpose",
+        "Validates raw data ingested from Kafka by Flink.",
+        "Bronze layer is append-only with minimal transformations.",
+        "",
+        "## Key Validations",
+        "- **Schema**: All expected columns present",
+        "- **Required Fields**: event_id, event_timestamp, ingested_at",
+        "- **Format**: UUID format for event_id, IP format for client_ip",
+        "",
+        "## Late Arrival Handling",
+        "The `is_late_arrival` flag is set by Flink when events arrive",
+        "past the watermark threshold (5 minutes)."
+      ]
+    }
+  }
+}
+

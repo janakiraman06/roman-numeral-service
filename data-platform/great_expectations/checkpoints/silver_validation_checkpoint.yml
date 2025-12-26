@@ -1,0 +1,71 @@
+# ============================================
+# Silver Layer Validation Checkpoint
+# ============================================
+# Runs all Silver layer expectation suites
+#
+# Usage:
+#   great_expectations checkpoint run silver_validation_checkpoint
+#
+# Or via Python:
+#   context.run_checkpoint(checkpoint_name="silver_validation_checkpoint")
+# ============================================
+
+name: silver_validation_checkpoint
+config_version: 1.0
+template_name: null
+module_name: great_expectations.checkpoint
+class_name: Checkpoint
+
+# Run ID template for tracking
+run_name_template: "silver_validation_%Y%m%d_%H%M%S"
+
+# Expectation suites to validate
+validations:
+  # Validate fact_conversions table
+  - batch_request:
+      datasource_name: lakehouse_spark
+      data_connector_name: iceberg_connector
+      data_asset_name: silver_fact_conversions
+      batch_identifiers:
+        batch_id: ${batch_id}
+        run_date: ${run_date}
+    expectation_suite_name: silver_fact_conversions_suite
+    
+  # Validate dim_users table
+  - batch_request:
+      datasource_name: lakehouse_spark
+      data_connector_name: iceberg_connector
+      data_asset_name: silver_dim_users
+      batch_identifiers:
+        batch_id: ${batch_id}
+        run_date: ${run_date}
+    expectation_suite_name: silver_dim_users_suite
+
+# Action list - what to do after validation
+action_list:
+  # Store validation results
+  - name: store_validation_result
+    action:
+      class_name: StoreValidationResultAction
+      
+  # Store evaluation parameters for downstream use
+  - name: store_evaluation_params
+    action:
+      class_name: StoreEvaluationParametersAction
+      
+  # Update Data Docs (HTML reports)
+  - name: update_data_docs
+    action:
+      class_name: UpdateDataDocsAction
+      site_names:
+        - local_site
+
+# Evaluation parameters (can be passed at runtime)
+evaluation_parameters: {}
+
+# Runtime configuration
+runtime_configuration: {}
+
+# Profilers (optional - for auto-generating expectations)
+profilers: []
+

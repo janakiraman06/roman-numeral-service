@@ -1,0 +1,42 @@
+# ============================================
+# Bronze Layer Validation Checkpoint
+# ============================================
+# Validates raw Bronze data before Silver ETL
+#
+# Usage:
+#   great_expectations checkpoint run bronze_validation_checkpoint
+# ============================================
+
+name: bronze_validation_checkpoint
+config_version: 1.0
+template_name: null
+module_name: great_expectations.checkpoint
+class_name: Checkpoint
+
+run_name_template: "bronze_validation_%Y%m%d_%H%M%S"
+
+validations:
+  - batch_request:
+      datasource_name: lakehouse_spark
+      data_connector_name: iceberg_connector
+      data_asset_name: bronze_conversion_events
+      batch_identifiers:
+        batch_id: ${batch_id}
+        run_date: ${run_date}
+    expectation_suite_name: bronze_conversion_events_suite
+
+action_list:
+  - name: store_validation_result
+    action:
+      class_name: StoreValidationResultAction
+      
+  - name: update_data_docs
+    action:
+      class_name: UpdateDataDocsAction
+      site_names:
+        - local_site
+
+evaluation_parameters: {}
+runtime_configuration: {}
+profilers: []
+

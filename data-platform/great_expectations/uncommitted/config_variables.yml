@@ -1,0 +1,18 @@
+# ============================================
+# Great Expectations Config Variables
+# ============================================
+# Environment-specific configuration values
+# This file is in uncommitted/ and should not be version controlled
+# ============================================
+
+# Spark connection (provided at runtime)
+spark_connection_string: "spark://spark-master:7077"
+
+# MinIO/S3 credentials (for production Data Docs site)
+s3_endpoint: "http://minio:9000"
+s3_access_key: "minioadmin"
+s3_secret_key: "minioadmin123"
+
+# Hive Metastore for Iceberg catalog
+hive_metastore_uri: "thrift://hive-metastore:9083"
+
