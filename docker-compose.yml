@@ -586,6 +586,22 @@ services:
     labels:
       logging: "promtail"
 
+  # Initialize Marquez with lineage graph
+  marquez-init:
+    image: curlimages/curl:8.5.0
+    container_name: marquez-init
+    profiles: ["data-platform"]
+    volumes:
+      - ./docker/marquez/init-lineage.sh:/init-lineage.sh:ro
+    entrypoint: ["/bin/sh", "/init-lineage.sh"]
+    environment:
+      MARQUEZ_URL: http://marquez:5000
+    depends_on:
+      marquez:
+        condition: service_healthy
+    networks:
+      - observability
+
   # ==========================================
   # Jupyter Notebook (Data Analysis)
   # ==========================================
