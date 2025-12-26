@@ -116,16 +116,19 @@ docker-compose up -d
 ### Run Full Data Platform
 
 ```bash
-# Start everything including data platform
-docker-compose --profile data-platform up -d
+# Start everything including data platform (21 services)
+docker-compose up -d
+
+# Wait for services to be healthy
+docker-compose ps
 
 # Additional services:
-# Airflow:    http://localhost:8280 (airflow/airflow)
+# Airflow:    http://localhost:8093 (airflow/airflow)
 # Superset:   http://localhost:8088 (admin/admin)
-# Spark UI:   http://localhost:8180
-# Flink UI:   http://localhost:8181
+# Spark UI:   http://localhost:8090
+# Flink UI:   http://localhost:8092
 # MinIO:      http://localhost:9001 (minioadmin/minioadmin123)
-# Marquez:    http://localhost:3001
+# Marquez:    http://localhost:5050 (API), http://localhost:3001 (Web)
 # Jupyter:    http://localhost:8888 (token: jupyter)
 ```
 
@@ -404,13 +407,14 @@ See [data-platform/README.md](data-platform/README.md) for detailed documentatio
 | **Grafana** | 3000 | http://localhost:3000 | admin/admin |
 | **Prometheus** | 9090 | http://localhost:9090 | - |
 | **PostgreSQL** | 5432 | - | romannumeral/romannumeral_secret |
-| **Kafka** | 9092 | - | - |
-| **Airflow** | 8280 | http://localhost:8280 | airflow/airflow |
+| **Kafka** | 9092/9094 | - | - |
+| **Airflow** | 8093 | http://localhost:8093 | airflow/airflow |
 | **Superset** | 8088 | http://localhost:8088 | admin/admin |
-| **Spark UI** | 8180 | http://localhost:8180 | - |
-| **Flink UI** | 8181 | http://localhost:8181 | - |
+| **Spark Master** | 8090 | http://localhost:8090 | - |
+| **Flink** | 8092 | http://localhost:8092 | - |
 | **MinIO** | 9001 | http://localhost:9001 | minioadmin/minioadmin123 |
-| **Marquez** | 3001 | http://localhost:3001 | - |
+| **Marquez API** | 5050 | http://localhost:5050 | - |
+| **Marquez Web** | 3001 | http://localhost:3001 | - |
 | **Jupyter** | 8888 | http://localhost:8888 | token: jupyter |
 
 ### Quick Commands

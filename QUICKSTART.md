@@ -12,35 +12,45 @@
 curl "http://localhost:8080/romannumeral?query=42"
 ```
 
-### Option 2: API + Observability Stack
+### Option 2: Core Services (API + Database + Observability)
 
 ```bash
 # Start core services
-docker-compose up -d
+docker-compose up -d postgres kafka roman-numeral-service grafana prometheus loki promtail
+
+# Wait for services to be healthy (about 30 seconds)
+docker-compose ps
 
 # Services available:
 # - API:        http://localhost:8080
 # - Swagger:    http://localhost:8080/swagger-ui/index.html
 # - Grafana:    http://localhost:3000 (admin/admin)
 # - Prometheus: http://localhost:9090
+# - Actuator:   http://localhost:8081/actuator
 ```
 
-### Option 3: Full Data Platform
+### Option 3: Full Data Platform (All 21 Services)
 
 ```bash
-# Start everything (takes 2-3 minutes first time)
+# Start everything (first time takes 5-10 minutes for image pulls)
 docker-compose up -d
 
-# Wait for services to be healthy
+# Wait for all services to be healthy
 docker-compose ps
 
-# Additional services:
-# - Airflow:    http://localhost:8280 (airflow/airflow)
+# Core Services:
+# - API:        http://localhost:8080
+# - Swagger:    http://localhost:8080/swagger-ui/index.html
+# - Grafana:    http://localhost:3000 (admin/admin)
+# - Prometheus: http://localhost:9090
+
+# Data Platform Services:
+# - Airflow:    http://localhost:8093 (airflow/airflow)
 # - Superset:   http://localhost:8088 (admin/admin)  
-# - Spark UI:   http://localhost:8180
-# - Flink UI:   http://localhost:8181
+# - Spark UI:   http://localhost:8090
+# - Flink UI:   http://localhost:8092
 # - MinIO:      http://localhost:9001 (minioadmin/minioadmin123)
-# - Marquez:    http://localhost:3001
+# - Marquez:    http://localhost:5050 (API), http://localhost:3001 (Web)
 # - Jupyter:    http://localhost:8888 (token: jupyter)
 ```
 
@@ -208,68 +218,98 @@ docker-compose logs -f --tail=100 -t
 
 ```bash
 # List topics
-docker exec -it kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
 
 # Create topic manually (if needed)
-docker exec -it kafka kafka-topics.sh --bootstrap-server localhost:9092 \
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
   --create --topic roman-numeral-events --partitions 3 --replication-factor 1
 
-# Consume messages
-docker exec -it kafka kafka-console-consumer.sh \
+# Consume messages (view live)
+docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server localhost:9092 \
   --topic roman-numeral-events \
   --from-beginning
+
+# Consume N messages and exit
+docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic roman-numeral-events \
+  --from-beginning \
+  --max-messages 5
+
+# Check message count
+docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic roman-numeral-events \
+  --from-beginning \
+  --timeout-ms 3000 2>/dev/null | wc -l
 ```
 
-### MinIO (S3)
+### MinIO (S3-Compatible Storage)
 
 ```bash
 # Open MinIO console
 open http://localhost:9001
 # Login: minioadmin / minioadmin123
 
-# Check lakehouse bucket exists
+# The 'lakehouse' bucket is created automatically for Iceberg tables
 ```
 
 ### Airflow
 
 ```bash
 # Open Airflow UI
-open http://localhost:8280
+open http://localhost:8093
 # Login: airflow / airflow
 
 # Trigger DAG manually
-docker exec -it airflow-scheduler airflow dags trigger rns_silver_etl
+docker exec airflow airflow dags trigger rns_silver_etl
+
+# List DAGs
+docker exec airflow airflow dags list
 ```
 
 ### Spark
 
 ```bash
 # Open Spark Master UI
-open http://localhost:8180
+open http://localhost:8090
 
-# Submit job manually
-docker exec -it spark-master spark-submit \
+# Open Spark worker logs
+open http://localhost:8091
+
+# Submit PySpark job
+docker exec spark-master /opt/spark/bin/spark-submit \
   --master spark://spark-master:7077 \
-  /opt/spark-jobs/your_job.py
+  /opt/spark-jobs/bronze_kafka_ingestion.py
 ```
 
 ### Flink
 
 ```bash
-# Open Flink UI
-open http://localhost:8181
+# Open Flink Dashboard
+open http://localhost:8092
 
-# Submit job
-docker exec -it flink-jobmanager flink run /opt/flink/jobs/your_job.jar
+# Check running jobs
+curl -s http://localhost:8092/jobs | jq .
+```
+
+### Marquez (Data Lineage)
+
+```bash
+# Open Marquez Web UI
+open http://localhost:3001
+
+# Check Marquez API
+curl -s http://localhost:5050/api/v1/namespaces | jq .
 ```
 
 ### Jupyter
 
 ```bash
-# Open Jupyter
+# Open Jupyter Lab
 open http://localhost:8888
-# Token: jupyter
+# Token: jupyter (or check docker-compose logs jupyter for the URL)
 ```
 
 ---
@@ -360,19 +400,53 @@ docker exec -it kafka kafka-broker-api-versions.sh --bootstrap-server localhost:
 
 ## 📁 Quick Reference: Service Ports
 
-| Service | Port | URL |
-|---------|------|-----|
-| API | 8080 | http://localhost:8080 |
-| Actuator | 8081 | http://localhost:8081/actuator |
-| Grafana | 3000 | http://localhost:3000 |
-| Prometheus | 9090 | http://localhost:9090 |
-| PostgreSQL | 5432 | - |
-| Kafka | 9092 | - |
-| Airflow | 8280 | http://localhost:8280 |
-| Superset | 8088 | http://localhost:8088 |
-| Spark UI | 8180 | http://localhost:8180 |
-| Flink UI | 8181 | http://localhost:8181 |
-| MinIO | 9001 | http://localhost:9001 |
-| Marquez | 3001 | http://localhost:3001 |
-| Jupyter | 8888 | http://localhost:8888 |
+| Service | Port | URL | Credentials |
+|---------|------|-----|-------------|
+| **Core Services** ||||
+| API | 8080 | http://localhost:8080 | - |
+| Actuator | 8081 | http://localhost:8081/actuator | - |
+| Swagger | 8080 | http://localhost:8080/swagger-ui/index.html | - |
+| PostgreSQL | 5432 | - | romannumeral / romannumeral_secret |
+| Kafka | 9092/9094 | - | - |
+| **Observability** ||||
+| Grafana | 3000 | http://localhost:3000 | admin / admin |
+| Prometheus | 9090 | http://localhost:9090 | - |
+| Loki | 3100 | - | - |
+| **Data Platform** ||||
+| Airflow | 8093 | http://localhost:8093 | airflow / airflow |
+| Superset | 8088 | http://localhost:8088 | admin / admin |
+| Spark Master | 8090 | http://localhost:8090 | - |
+| Spark Worker | 8091 | http://localhost:8091 | - |
+| Flink | 8092 | http://localhost:8092 | - |
+| MinIO | 9001 | http://localhost:9001 | minioadmin / minioadmin123 |
+| Marquez API | 5050 | http://localhost:5050 | - |
+| Marquez Web | 3001 | http://localhost:3001 | - |
+| Jupyter | 8888 | http://localhost:8888 | token: jupyter |
+
+---
+
+## ✅ Verified Working (as of Dec 2024)
+
+The following end-to-end flow has been tested:
+
+```
+API Request → Spring Boot → Kafka (roman-numeral-events) → Verified ✅
+```
+
+All 21 services start successfully with `docker-compose up -d`.
+
+### Sample Kafka Event
+
+```json
+{
+  "eventId": "7ad50b2a-f297-41b0-95e2-90395a0264b7",
+  "eventTime": "2025-12-26T01:42:50.883Z",
+  "eventType": "SINGLE",
+  "inputNumber": 42,
+  "outputRoman": "XLII",
+  "responseTimeNanos": 48292,
+  "status": "SUCCESS",
+  "clientIp": "172.18.0.1",
+  "correlationId": "af31a529"
+}
 
