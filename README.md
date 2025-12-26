@@ -71,7 +71,7 @@ Build a web service that converts integers to Roman numerals, supporting:
 - **Analytics**: Jupyter notebooks with PySpark
 
 ### DevOps
-- **Containerized**: Docker Compose with 15+ services
+- **Containerized**: Docker Compose with 18 services
 - **CI/CD**: GitHub Actions with quality gates
 - **Observability**: Full PLG stack (Prometheus, Loki, Grafana)
 
@@ -115,7 +115,7 @@ curl "http://localhost:8080/romannumeral?query=42"
 
 ```bash
 # Build and start the full stack (API + Observability)
-docker-compose up -d
+docker compose up -d
 
 # Access the services
 # API:        http://localhost:8080
@@ -146,9 +146,6 @@ docker ps --format "table {{.Names}}\t{{.Status}}" | head -20
 ### Quick Verification
 
 For detailed step-by-step instructions, see [QUICKSTART.md](QUICKSTART.md).
-# Marquez:    http://localhost:5050 (API), http://localhost:3001 (Web)
-# Jupyter:    http://localhost:8888 (token: jupyter)
-```
 
 ---
 
@@ -338,7 +335,7 @@ curl "http://localhost:8080/romannumeral?query=42&apiKey=your-api-key"
 
 | Layer | Purpose | Technology | Update Frequency |
 |-------|---------|------------|------------------|
-| **Bronze** | Raw data preservation | Flink streaming | Real-time |
+| **Bronze** | Raw data preservation | Spark batch (Kafka) | Continuous |
 | **Silver** | Cleaned, deduplicated | Spark batch | Hourly |
 | **Gold** | Aggregated metrics | Spark batch | Daily |
 
@@ -378,7 +375,7 @@ See [data-platform/README.md](data-platform/README.md) for detailed documentatio
 
 | Profile | API Keys | Logging | Rate Limit | Database |
 |---------|----------|---------|------------|----------|
-| `dev` | Disabled | DEBUG | 1000/min | PostgreSQL |
+| `dev` | Disabled | DEBUG | 50000/min | PostgreSQL |
 | `prod` | Enabled | INFO | 100/min | PostgreSQL |
 | `test` | Disabled | WARN | - | H2 |
 
@@ -436,20 +433,20 @@ See [data-platform/README.md](data-platform/README.md) for detailed documentatio
 ### Quick Commands
 
 ```bash
-# Start core services
-docker-compose up -d
-
-# Start with data platform
-docker-compose --profile data-platform up -d
+# Start all services (18 containers including data platform)
+docker compose up -d
 
 # View logs
-docker-compose logs -f roman-numeral-service
+docker compose logs -f roman-numeral-service
+
+# Check Airflow initialization (takes ~2 minutes)
+docker compose logs -f airflow
 
 # Stop all
-docker-compose down
+docker compose down
 
-# Clean restart
-docker-compose down -v && docker-compose up -d
+# Clean restart (removes all data)
+docker compose down -v && docker compose up -d
 ```
 
 ---
