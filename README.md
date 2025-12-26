@@ -111,37 +111,40 @@ curl "http://localhost:8080/romannumeral?query=42"
 # Response: {"input":"42","output":"XLII"}
 ```
 
-### Run with Docker
+### Run with Docker (Profiles)
 
 ```bash
-# Build and start the full stack (API + Observability)
+# OPTION 1: Core only (3 services, ~2 GB RAM)
 docker compose up -d
+# Services: postgres, kafka, roman-numeral-service
+# API: http://localhost:8080
 
-# Access the services
-# API:        http://localhost:8080
-# Grafana:    http://localhost:3000 (admin/admin)
-# Prometheus: http://localhost:9090
-# Swagger:    http://localhost:8080/swagger-ui/index.html
+# OPTION 2: Core + Observability (7 services, ~4 GB RAM)
+docker compose --profile observability up -d
+# Additional: prometheus, grafana, loki, promtail
+# Grafana: http://localhost:3000 (admin/admin)
+
+# OPTION 3: Full Data Platform (18 services, ~12 GB RAM)
+docker compose --profile data-platform up -d
+# Additional: minio, spark, flink, airflow, marquez, jupyter
+# Airflow: http://localhost:8093 (admin/admin) - takes 2-3 min to initialize
+# Jupyter: http://localhost:8888 (token: jupyter)
 ```
 
-### Run Full Data Platform
+### Service URLs
 
-```bash
-# Start everything including data platform (18 services)
-docker compose up -d
-
-# Wait for services to be healthy (2-3 minutes)
-# Airflow takes the longest to initialize
-docker ps --format "table {{.Names}}\t{{.Status}}" | head -20
-
-# Additional services:
-# Airflow:    http://localhost:8093 (admin/admin)
-# Jupyter:    http://localhost:8888 (token: jupyter)
-# Spark UI:   http://localhost:8090
-# Flink UI:   http://localhost:8092
-# MinIO:      http://localhost:9001 (minioadmin/minioadmin123)
-# Marquez:    http://localhost:3001
-```
+| Tier | Service | URL | Credentials |
+|------|---------|-----|-------------|
+| Core | API | http://localhost:8080 | - |
+| Core | Swagger | http://localhost:8080/swagger-ui/index.html | - |
+| Observability | Grafana | http://localhost:3000 | admin/admin |
+| Observability | Prometheus | http://localhost:9090 | - |
+| Data Platform | Airflow | http://localhost:8093 | admin/admin |
+| Data Platform | Jupyter | http://localhost:8888 | token: jupyter |
+| Data Platform | Spark UI | http://localhost:8090 | - |
+| Data Platform | Flink UI | http://localhost:8092 | - |
+| Data Platform | MinIO | http://localhost:9001 | minioadmin/minioadmin123 |
+| Data Platform | Marquez | http://localhost:3001 | - |
 
 ### Quick Verification
 
@@ -433,20 +436,26 @@ See [data-platform/README.md](data-platform/README.md) for detailed documentatio
 ### Quick Commands
 
 ```bash
-# Start all services (18 containers including data platform)
+# Start core only
 docker compose up -d
+
+# Start with observability
+docker compose --profile observability up -d
+
+# Start full data platform
+docker compose --profile data-platform up -d
 
 # View logs
 docker compose logs -f roman-numeral-service
 
 # Check Airflow initialization (takes ~2 minutes)
-docker compose logs -f airflow
+docker compose --profile data-platform logs -f airflow
 
-# Stop all
-docker compose down
+# Stop all (include profile to stop profiled services)
+docker compose --profile data-platform down
 
-# Clean restart (removes all data)
-docker compose down -v && docker compose up -d
+# Clean restart
+docker compose --profile data-platform down -v && docker compose --profile data-platform up -d
 ```
 
 ---

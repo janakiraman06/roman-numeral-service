@@ -2,14 +2,14 @@
 
 ## System Requirements
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **API Only** | 2 GB RAM, 1 GB disk | 4 GB RAM |
-| **Core Services** | 4 GB RAM, 5 GB disk | 8 GB RAM |
-| **Full Data Platform** | 8 GB RAM, 30 GB disk | 16 GB RAM, 40 GB disk |
-| **Docker Memory** | 6 GB | 10 GB |
+| Profile | Command | Services | RAM | Disk |
+|---------|---------|----------|-----|------|
+| **API Only** | `./mvnw spring-boot:run` | 1 | 1 GB | 500 MB |
+| **Core** | `docker compose up -d` | 3 | 2 GB | 3 GB |
+| **Observability** | `--profile observability` | 7 | 4 GB | 5 GB |
+| **Data Platform** | `--profile data-platform` | 18 | 12 GB | 30 GB |
 
-> **Note:** First `docker compose up` downloads ~15 GB of images. Allow 10-15 minutes.
+> **Note:** First `docker compose --profile data-platform up` downloads ~15 GB of images. Allow 10-15 minutes.
 
 ---
 
@@ -25,37 +25,40 @@
 curl "http://localhost:8080/romannumeral?query=42"
 ```
 
-### Option 2: Core Services (API + Database + Observability)
+### Option 2: Core Services Only (3 services, ~2 GB RAM)
 
 ```bash
-# Start core services
-docker-compose up -d postgres kafka roman-numeral-service grafana prometheus loki promtail
+# Start core services (postgres, kafka, roman-numeral-service)
+docker compose up -d
 
 # Wait for services to be healthy (about 30 seconds)
-docker-compose ps
+docker compose ps
 
 # Services available:
 # - API:        http://localhost:8080
 # - Swagger:    http://localhost:8080/swagger-ui/index.html
-# - Grafana:    http://localhost:3000 (admin/admin)
-# - Prometheus: http://localhost:9090
 # - Actuator:   http://localhost:8081/actuator
 ```
 
-### Option 3: Full Data Platform (All 18 Services)
+### Option 3: Core + Observability (7 services, ~4 GB RAM)
+
+```bash
+# Start with monitoring
+docker compose --profile observability up -d
+
+# Additional services:
+# - Grafana:    http://localhost:3000 (admin/admin)
+# - Prometheus: http://localhost:9090
+```
+
+### Option 4: Full Data Platform (18 services, ~12 GB RAM)
 
 ```bash
 # Start everything (first time takes 10-15 minutes for image pulls)
-docker compose up -d
+docker compose --profile data-platform up -d
 
 # Wait for all services to be healthy (2-3 minutes)
-docker ps --format "table {{.Names}}\t{{.Status}}" | head -20
-
-# Core Services:
-# - API:        http://localhost:8080
-# - Swagger:    http://localhost:8080/swagger-ui/index.html
-# - Grafana:    http://localhost:3000 (admin/admin)
-# - Prometheus: http://localhost:9090
+docker compose --profile data-platform ps
 
 # Data Platform Services:
 # - Airflow:    http://localhost:8093 (admin/admin)
@@ -67,7 +70,7 @@ docker ps --format "table {{.Names}}\t{{.Status}}" | head -20
 ```
 
 > **Important:** Airflow takes 2-3 minutes to fully initialize on first start (DB setup + Docker CLI install).  
-> Check progress: `docker compose logs -f airflow` - look for "DB ready, initializing..."
+> Check progress: `docker compose --profile data-platform logs -f airflow` - look for "DB ready, initializing..."
 
 ---
 
@@ -98,8 +101,8 @@ curl http://localhost:8081/actuator/health
 
 ```bash
 # Start with prod profile
-docker-compose down
-SPRING_PROFILES_ACTIVE=prod docker-compose up -d
+docker compose down
+SPRING_PROFILES_ACTIVE=prod docker compose up -d
 
 # Without API key (401)
 curl "http://localhost:8080/romannumeral?query=42"
@@ -138,25 +141,27 @@ curl "http://localhost:8080/romannumeral?min=1&max=3999&limit=100" | jq '.pagina
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d                              # Core only
+docker compose --profile observability up -d      # + Monitoring
+docker compose --profile data-platform up -d      # Full stack
 
 # View logs
-docker-compose logs -f roman-numeral-service
+docker compose logs -f roman-numeral-service
 
 # View all logs
-docker-compose logs -f
+docker compose --profile data-platform logs -f
 
 # Stop all
-docker-compose down
+docker compose --profile data-platform down
 
 # Clean restart (removes volumes)
-docker-compose down -v && docker-compose up -d
+docker compose --profile data-platform down -v && docker compose --profile data-platform up -d
 
 # Check service health
-docker-compose ps
+docker compose --profile data-platform ps
 
 # Restart single service
-docker-compose restart roman-numeral-service
+docker compose restart roman-numeral-service
 ```
 
 ### Maven
@@ -218,10 +223,10 @@ open http://localhost:9090/graph
 
 ```bash
 # Application logs
-docker-compose logs -f roman-numeral-service
+docker compose logs -f roman-numeral-service
 
 # All logs with timestamps
-docker-compose logs -f --tail=100 -t
+docker compose logs -f --tail=100 -t
 ```
 
 ---
@@ -393,10 +398,10 @@ spark.sql("SELECT * FROM lakehouse.gold.popular_numbers ORDER BY request_count D
 
 ```bash
 # 1. Start everything
-docker-compose up -d
+docker compose --profile data-platform up -d
 
 # 2. Wait for services (check health)
-sleep 30 && docker-compose ps
+sleep 30 && docker compose --profile data-platform ps
 
 # 3. Generate some conversions
 for i in {1..100}; do
@@ -436,22 +441,22 @@ kill -9 <PID>
 
 ```bash
 # Check logs
-docker-compose logs <service-name>
+docker compose logs <service-name>
 
 # Restart service
-docker-compose restart <service-name>
+docker compose restart <service-name>
 
 # Full rebuild
-docker-compose down -v
-docker-compose build --no-cache
-docker-compose up -d
+docker compose --profile data-platform down -v
+docker compose build --no-cache
+docker compose --profile data-platform up -d
 ```
 
 ### Database Connection Issues
 
 ```bash
 # Check PostgreSQL is running
-docker-compose ps postgres
+docker compose ps postgres
 
 # Test connection
 docker exec -it postgres pg_isready -U romannumeral
@@ -461,7 +466,7 @@ docker exec -it postgres pg_isready -U romannumeral
 
 ```bash
 # Check Kafka is running
-docker-compose ps kafka
+docker compose ps kafka
 
 # Check broker is ready
 docker exec -it kafka kafka-broker-api-versions.sh --bootstrap-server localhost:9092
@@ -503,7 +508,7 @@ The following end-to-end flow has been tested:
 API Request → Spring Boot → Kafka → Spark (Bronze/Silver/Gold) → Iceberg → Jupyter ✅
 ```
 
-All 18 services start successfully with `docker compose up -d`.
+All 18 services start successfully with `docker compose --profile data-platform up -d`.
 
 ### Sample Kafka Event
 

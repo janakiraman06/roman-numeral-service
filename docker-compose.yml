@@ -1,27 +1,28 @@
 # ============================================
 # Roman Numeral Service - Docker Compose
 # ============================================
-# Full observability + data engineering stack
-# Just run: docker-compose up -d
+# Production-ready stack with optional profiles
 #
-# Components:
-# - Application (Spring Boot + Java 21)
-# - PostgreSQL (Database - OLTP)
-# - Kafka (Event streaming - Bronze layer ingestion)
-# - MinIO (S3-compatible object storage)
-# - Iceberg REST Catalog (table metadata)
-# - Flink (Streaming engine - Bronze layer)
-# - Spark (Batch engine - Silver/Gold layers)
-# - Airflow (Orchestration - ETL scheduling)
-# - Prometheus (Metrics collection)
-# - Loki + Promtail (Log aggregation)
-# - Grafana (Visualization)
-# - Marquez (Data lineage with OpenLineage)
-# - Superset (BI dashboards)
-# - Jupyter (Data analysis notebooks)
+# PROFILES:
+#   docker compose up -d                      # Core only (3 services)
+#   docker compose --profile observability up -d  # + Monitoring (7 services)
+#   docker compose --profile data-platform up -d  # + Data Platform (18 services)
 #
-# Note: Uses json-file logging driver (default) instead of
-# Loki plugin. Promtail scrapes logs from Docker log files.
+# CORE (always starts):
+# - roman-numeral-service (Spring Boot API)
+# - postgres (Application database)
+# - kafka (Event streaming)
+#
+# OBSERVABILITY PROFILE:
+# - prometheus, grafana, loki, promtail
+#
+# DATA-PLATFORM PROFILE (includes observability):
+# - minio, iceberg-rest (Storage & Catalog)
+# - spark-master, spark-worker (Batch ETL)
+# - flink-jobmanager, flink-taskmanager (Streaming)
+# - airflow, airflow-db (Orchestration)
+# - marquez, marquez-db, marquez-web (Lineage)
+# - jupyter (Analytics)
 # ============================================
 
 services:
@@ -93,6 +94,7 @@ services:
   minio:
     image: minio/minio:RELEASE.2024-01-01T16-36-33Z
     container_name: minio
+    profiles: ["data-platform"]
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Console UI
@@ -115,6 +117,7 @@ services:
   minio-init:
     image: minio/mc:latest
     container_name: minio-init
+    profiles: ["data-platform"]
     depends_on:
       minio:
         condition: service_healthy
@@ -140,6 +143,7 @@ services:
   iceberg-rest:
     image: tabulario/iceberg-rest:1.5.0
     container_name: iceberg-rest
+    profiles: ["data-platform"]
     ports:
       - "8181:8181"   # REST API port
     environment:
@@ -176,6 +180,7 @@ services:
   flink-jobmanager:
     image: flink:1.18-java17
     container_name: flink-jobmanager
+    profiles: ["data-platform"]
     ports:
       - "8092:8081"   # Flink Web UI
       - "6123:6123"   # RPC port
@@ -220,6 +225,7 @@ services:
   flink-taskmanager:
     image: flink:1.18-java17
     container_name: flink-taskmanager
+    profiles: ["data-platform"]
     environment:
       JOB_MANAGER_RPC_ADDRESS: flink-jobmanager
       FLINK_PROPERTIES: |
@@ -246,6 +252,7 @@ services:
   spark-master:
     image: apache/spark:3.5.0
     container_name: spark-master
+    profiles: ["data-platform"]
     ports:
       - "8090:8080"   # Spark Master UI
       - "7077:7077"   # Spark Master port
@@ -274,6 +281,7 @@ services:
   spark-worker:
     image: apache/spark:3.5.0
     container_name: spark-worker
+    profiles: ["data-platform"]
     ports:
       - "8091:8081"   # Spark Worker UI
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
@@ -299,6 +307,7 @@ services:
   airflow:
     image: apache/airflow:2.8.1-python3.11
     container_name: airflow
+    profiles: ["data-platform"]
     user: root  # Required for Docker socket access
     entrypoint: /bin/bash  # Override default entrypoint to control init sequence
     ports:
@@ -364,6 +373,7 @@ services:
   airflow-db:
     image: postgres:16-alpine
     container_name: airflow-db
+    profiles: ["data-platform"]
     environment:
       POSTGRES_DB: airflow
       POSTGRES_USER: airflow
@@ -427,8 +437,6 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      loki:
-        condition: service_started
 
   # ==========================================
   # Prometheus (Metrics Collection)
@@ -436,6 +444,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.48.0
     container_name: prometheus
+    profiles: ["observability", "data-platform"]
     ports:
       - "9090:9090"
     volumes:
@@ -458,6 +467,7 @@ services:
   loki:
     image: grafana/loki:2.9.2
     container_name: loki
+    profiles: ["observability", "data-platform"]
     ports:
       - "3100:3100"
     volumes:
@@ -475,6 +485,7 @@ services:
   promtail:
     image: grafana/promtail:2.9.2
     container_name: promtail
+    profiles: ["observability", "data-platform"]
     volumes:
       - ./docker/loki/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -491,6 +502,7 @@ services:
   grafana:
     image: grafana/grafana:10.2.2
     container_name: grafana
+    profiles: ["observability", "data-platform"]
     ports:
       - "3000:3000"
     environment:
@@ -517,6 +529,7 @@ services:
   marquez:
     image: marquezproject/marquez:0.47.0
     container_name: marquez
+    profiles: ["data-platform"]
     ports:
       - "5050:5000"   # API (5050 to avoid macOS AirPlay conflict)
       - "5001:5001"   # Admin
@@ -541,6 +554,7 @@ services:
   marquez-db:
     image: postgres:16-alpine
     container_name: marquez-db
+    profiles: ["data-platform"]
     environment:
       POSTGRES_DB: marquez
       POSTGRES_USER: marquez
@@ -558,6 +572,7 @@ services:
   marquez-web:
     image: marquezproject/marquez-web:0.47.0
     container_name: marquez-web
+    profiles: ["data-platform"]
     ports:
       - "3001:3000"
     environment:
@@ -581,6 +596,7 @@ services:
   jupyter:
     image: jupyter/pyspark-notebook:spark-3.5.0
     container_name: jupyter
+    profiles: ["data-platform"]
     ports:
       - "8888:8888"
     environment:
