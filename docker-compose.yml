@@ -10,6 +10,8 @@
 # - Kafka (Event streaming - Bronze layer ingestion)
 # - MinIO (S3-compatible object storage)
 # - Hive Metastore (Iceberg catalog)
+# - Flink (Streaming engine - Bronze layer)
+# - Spark (Batch engine - Silver/Gold layers)
 # - Prometheus (Metrics collection)
 # - Loki + Promtail (Log aggregation)
 # - Grafana (Visualization)
@@ -154,9 +156,10 @@ services:
   # Hive Metastore (Iceberg Catalog)
   # ==========================================
   # Provides catalog service for Iceberg tables
-  # Used by Spark for table discovery and schema management
+  # Used by Spark/Flink for table discovery and schema management
+  # Using 3.1.3 for better Iceberg compatibility (well-documented)
   hive-metastore:
-    image: apache/hive:4.0.0
+    image: apache/hive:3.1.3
     container_name: hive-metastore
     ports:
       - "9083:9083"   # Thrift port for Spark/Trino connections
@@ -182,6 +185,144 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    networks:
+      - observability
+
+  # ==========================================
+  # Apache Flink JobManager
+  # ==========================================
+  # Streaming engine for Bronze layer ingestion
+  # UI available at http://localhost:8092
+  # Handles: exactly-once, watermarks, late arrivals, DLQ
+  flink-jobmanager:
+    image: flink:1.18-scala_2.12-java11
+    container_name: flink-jobmanager
+    ports:
+      - "8092:8081"   # Flink Web UI
+      - "6123:6123"   # RPC port
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES=
+          jobmanager.rpc.address: flink-jobmanager
+          state.backend: rocksdb
+          state.backend.rocksdb.localdir: /tmp/flink-rocksdb
+          state.checkpoints.dir: s3://lakehouse/flink/checkpoints
+          state.savepoints.dir: s3://lakehouse/flink/savepoints
+          execution.checkpointing.interval: 60000
+          execution.checkpointing.mode: EXACTLY_ONCE
+          execution.checkpointing.min-pause: 30000
+          execution.checkpointing.timeout: 600000
+          restart-strategy: fixed-delay
+          restart-strategy.fixed-delay.attempts: 3
+          restart-strategy.fixed-delay.delay: 30s
+          s3.endpoint: http://minio:9000
+          s3.path-style-access: true
+          s3.access-key: minioadmin
+          s3.secret-key: minioadmin123
+    volumes:
+      - ./data-platform/flink/bronze-ingestion:/opt/flink-jobs/bronze-ingestion:ro
+      - ./data-platform/flink/conf/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml:ro
+      - flink_data:/tmp/flink-rocksdb
+    command: jobmanager
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - observability
+
+  # ==========================================
+  # Apache Flink TaskManager
+  # ==========================================
+  # Executes Flink streaming tasks
+  flink-taskmanager:
+    image: flink:1.18-scala_2.12-java11
+    container_name: flink-taskmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+      - FLINK_PROPERTIES=
+          jobmanager.rpc.address: flink-jobmanager
+          taskmanager.numberOfTaskSlots: 4
+          taskmanager.memory.process.size: 2g
+          state.backend: rocksdb
+          state.backend.rocksdb.localdir: /tmp/flink-rocksdb
+          s3.endpoint: http://minio:9000
+          s3.path-style-access: true
+          s3.access-key: minioadmin
+          s3.secret-key: minioadmin123
+    volumes:
+      - ./data-platform/flink/bronze-ingestion:/opt/flink-jobs/bronze-ingestion:ro
+      - flink_data:/tmp/flink-rocksdb
+    command: taskmanager
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+    networks:
+      - observability
+
+  # ==========================================
+  # Apache Spark Master
+  # ==========================================
+  # Batch processing engine for Silver/Gold layers
+  # UI available at http://localhost:8090
+  spark-master:
+    image: bitnami/spark:3.5.0
+    container_name: spark-master
+    ports:
+      - "8090:8080"   # Spark Master UI
+      - "7077:7077"   # Spark Master port
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - ./data-platform/spark/jobs:/opt/spark-jobs:ro
+      - ./data-platform/spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf:ro
+      - spark_data:/opt/bitnami/spark/work
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - observability
+
+  # ==========================================
+  # Apache Spark Worker
+  # ==========================================
+  # Executes Spark batch tasks for Silver/Gold ETL
+  spark-worker:
+    image: bitnami/spark:3.5.0
+    container_name: spark-worker
+    ports:
+      - "8091:8081"   # Spark Worker UI
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - ./data-platform/spark/jobs:/opt/spark-jobs:ro
+      - ./data-platform/spark/conf/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf:ro
+      - spark_data:/opt/bitnami/spark/work
+    depends_on:
+      spark-master:
+        condition: service_healthy
     networks:
       - observability
 
@@ -329,6 +470,8 @@ volumes:
   minio_data:
   hive_metastore_db_data:
   hive_warehouse:
+  flink_data:
+  spark_data:
   prometheus_data:
   loki_data:
   grafana_data:
