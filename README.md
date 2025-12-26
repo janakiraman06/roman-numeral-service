@@ -79,76 +79,37 @@ Build a web service that converts integers to Roman numerals, supporting:
 
 ## Quick Start
 
-### Prerequisites
-
-- Java 21 or higher
-- Maven 3.9+ (or use included wrapper)
-- Docker & Docker Compose (for full stack)
-
-### System Requirements
-
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **Backend Only** | 4 GB RAM, 5 GB disk | 8 GB RAM |
-| **Full Stack (with Data Platform)** | 8 GB RAM, 30 GB disk | 16 GB RAM, 40 GB disk |
-| **Docker Memory Limit** | 6 GB | 10 GB |
-| **CPU Cores** | 4 | 8 |
-
-> **Note:** The data platform includes Spark, Flink, Kafka, and Jupyter which require significant resources. If resources are limited, run the backend only (see [Backend Only](#run-locally)).
-
-### Run Locally
-
 ```bash
-# Clone the repository
+# Clone and run
 git clone https://github.com/janakiraman06/roman-numeral-service.git
 cd roman-numeral-service
-
-# Build and run
-./mvnw spring-boot:run
+docker compose up -d
 
 # Test the API
 curl "http://localhost:8080/romannumeral?query=42"
-# Response: {"input":"42","output":"XLII"}
+# {"input":"42","output":"XLII"}
+
+# View Swagger UI
+open http://localhost:8080/swagger-ui/index.html
 ```
 
-### Run with Docker (Profiles)
+### Docker Profiles (Choose Your Stack)
+
+| Profile | Command | Services | RAM |
+|---------|---------|----------|-----|
+| Core | `docker compose up -d` | 3 | 2 GB |
+| + Monitoring | `--profile observability` | 7 | 4 GB |
+| + Data Platform | `--profile data-platform` | 18 | 12 GB |
 
 ```bash
-# OPTION 1: Core only (3 services, ~2 GB RAM)
-docker compose up -d
-# Services: postgres, kafka, roman-numeral-service
-# API: http://localhost:8080
-
-# OPTION 2: Core + Observability (7 services, ~4 GB RAM)
+# With Grafana/Prometheus
 docker compose --profile observability up -d
-# Additional: prometheus, grafana, loki, promtail
-# Grafana: http://localhost:3000 (admin/admin)
 
-# OPTION 3: Full Data Platform (18 services, ~12 GB RAM)
+# Full stack (Spark, Flink, Airflow, Jupyter)
 docker compose --profile data-platform up -d
-# Additional: minio, spark, flink, airflow, marquez, jupyter
-# Airflow: http://localhost:8093 (admin/admin) - takes 2-3 min to initialize
-# Jupyter: http://localhost:8888 (token: jupyter)
 ```
 
-### Service URLs
-
-| Tier | Service | URL | Credentials |
-|------|---------|-----|-------------|
-| Core | API | http://localhost:8080 | - |
-| Core | Swagger | http://localhost:8080/swagger-ui/index.html | - |
-| Observability | Grafana | http://localhost:3000 | admin/admin |
-| Observability | Prometheus | http://localhost:9090 | - |
-| Data Platform | Airflow | http://localhost:8093 | admin/admin |
-| Data Platform | Jupyter | http://localhost:8888 | token: jupyter |
-| Data Platform | Spark UI | http://localhost:8090 | - |
-| Data Platform | Flink UI | http://localhost:8092 | - |
-| Data Platform | MinIO | http://localhost:9001 | minioadmin/minioadmin123 |
-| Data Platform | Marquez | http://localhost:3001 | - |
-
-### Quick Verification
-
-For detailed step-by-step instructions, see [QUICKSTART.md](QUICKSTART.md).
+> **See [QUICKSTART.md](QUICKSTART.md)** for detailed commands, testing, troubleshooting, and all service URLs.
 
 ---
 
@@ -433,30 +394,9 @@ See [data-platform/README.md](data-platform/README.md) for detailed documentatio
 | **Marquez Web** | 3001 | http://localhost:3001 | - |
 | **Jupyter** | 8888 | http://localhost:8888 | token: jupyter |
 
-### Quick Commands
+### Commands
 
-```bash
-# Start core only
-docker compose up -d
-
-# Start with observability
-docker compose --profile observability up -d
-
-# Start full data platform
-docker compose --profile data-platform up -d
-
-# View logs
-docker compose logs -f roman-numeral-service
-
-# Check Airflow initialization (takes ~2 minutes)
-docker compose --profile data-platform logs -f airflow
-
-# Stop all (include profile to stop profiled services)
-docker compose --profile data-platform down
-
-# Clean restart
-docker compose --profile data-platform down -v && docker compose --profile data-platform up -d
-```
+See [Quick Start](#quick-start) for profile commands, or [QUICKSTART.md](QUICKSTART.md) for full reference.
 
 ---
 
