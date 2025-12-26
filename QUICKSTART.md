@@ -6,10 +6,12 @@
 |---------|---------|----------|-----|------|
 | **API Only** | `./mvnw spring-boot:run` | 1 | 1 GB | 500 MB |
 | **Core** | `docker compose up -d` | 3 | 2 GB | 3 GB |
-| **Observability** | `--profile observability` | 7 | 4 GB | 5 GB |
-| **Data Platform** | `--profile data-platform` | 18 | 12 GB | 30 GB |
+| **+ Observability** | `--profile observability` | 7 | 4 GB | 5 GB |
+| **+ Data Platform** | `--profile data-platform` | 18 | 12 GB | 30 GB |
 
-> **Note:** First `docker compose --profile data-platform up` downloads ~15 GB of images. Allow 10-15 minutes.
+> **Note:** Profiles are cumulative. `observability` includes Core. `data-platform` includes Core + Observability.
+>
+> First `docker compose --profile data-platform up` downloads ~15 GB of images. Allow 10-15 minutes.
 
 ---
 

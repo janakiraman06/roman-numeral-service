@@ -101,6 +101,8 @@ open http://localhost:8080/swagger-ui/index.html
 | + Monitoring | `--profile observability` | 7 | 4 GB |
 | + Data Platform | `--profile data-platform` | 18 | 12 GB |
 
+> **Note:** Profiles are cumulative. `observability` includes Core. `data-platform` includes Core + Observability.
+
 ```bash
 # With Grafana/Prometheus
 docker compose --profile observability up -d
