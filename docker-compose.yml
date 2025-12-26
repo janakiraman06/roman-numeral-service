@@ -18,6 +18,7 @@
 # - Grafana (Visualization)
 # - Marquez (Data lineage with OpenLineage)
 # - Superset (BI dashboards)
+# - Jupyter (Data analysis notebooks)
 #
 # Note: Uses json-file logging driver (default) instead of
 # Loki plugin. Promtail scrapes logs from Docker log files.
@@ -672,6 +673,42 @@ services:
     networks:
       - observability
 
+  # ==========================================
+  # Jupyter Notebook (Data Analysis)
+  # ==========================================
+  # Web UI: http://localhost:8888
+  # Token: Check logs or use 'jupyter' as password
+  # ==========================================
+  
+  jupyter:
+    image: jupyter/pyspark-notebook:spark-3.5.0
+    container_name: jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      # Jupyter settings
+      JUPYTER_ENABLE_LAB: "yes"
+      JUPYTER_TOKEN: "jupyter"
+      # Spark settings for connecting to cluster
+      SPARK_MASTER: "spark://spark-master:7077"
+      # MinIO/S3 settings
+      AWS_ACCESS_KEY_ID: "minioadmin"
+      AWS_SECRET_ACCESS_KEY: "minioadmin123"
+      AWS_ENDPOINT_URL: "http://minio:9000"
+    volumes:
+      - ./data-platform/notebooks:/home/jovyan/work
+      - jupyter_data:/home/jovyan/.local
+    user: root
+    command: >
+      bash -c "
+        pip install --quiet psycopg2-binary sqlalchemy pandas-profiling ydata-profiling great-expectations pyiceberg &&
+        start-notebook.sh --NotebookApp.token='jupyter'
+      "
+    networks:
+      - observability
+    labels:
+      logging: "promtail"
+
 # ==========================================
 # Networks
 # ==========================================
@@ -698,4 +735,5 @@ volumes:
   superset_home:
   superset_db_data:
   superset_redis_data:
+  jupyter_data:
 
