@@ -65,10 +65,10 @@ Build a web service that converts integers to Roman numerals, supporting:
 ### Data Platform
 - **Event Streaming**: Kafka producer for all conversion events
 - **Lakehouse**: Iceberg tables on MinIO (S3-compatible)
-- **ETL Pipelines**: Airflow-orchestrated Flink + Spark jobs
-- **Data Quality**: Great Expectations validation
+- **ETL Pipelines**: Airflow-orchestrated Spark batch jobs
+- **Streaming Demo**: Flink real-time processing (Kafka → console)
 - **Data Lineage**: Marquez + OpenLineage
-- **BI Dashboards**: Apache Superset
+- **Analytics**: Jupyter notebooks with PySpark
 
 ### DevOps
 - **Containerized**: Docker Compose with 15+ services
@@ -84,6 +84,17 @@ Build a web service that converts integers to Roman numerals, supporting:
 - Java 21 or higher
 - Maven 3.9+ (or use included wrapper)
 - Docker & Docker Compose (for full stack)
+
+### System Requirements
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **Backend Only** | 4 GB RAM, 5 GB disk | 8 GB RAM |
+| **Full Stack (with Data Platform)** | 8 GB RAM, 30 GB disk | 16 GB RAM, 40 GB disk |
+| **Docker Memory Limit** | 6 GB | 10 GB |
+| **CPU Cores** | 4 | 8 |
+
+> **Note:** The data platform includes Spark, Flink, Kafka, and Jupyter which require significant resources. If resources are limited, run the backend only (see [Backend Only](#run-locally)).
 
 ### Run Locally
 
@@ -116,18 +127,25 @@ docker-compose up -d
 ### Run Full Data Platform
 
 ```bash
-# Start everything including data platform (21 services)
-docker-compose up -d
+# Start everything including data platform (18 services)
+docker compose up -d
 
-# Wait for services to be healthy
-docker-compose ps
+# Wait for services to be healthy (2-3 minutes)
+# Airflow takes the longest to initialize
+docker ps --format "table {{.Names}}\t{{.Status}}" | head -20
 
 # Additional services:
-# Airflow:    http://localhost:8093 (airflow/airflow)
-# Superset:   http://localhost:8088 (admin/admin)
+# Airflow:    http://localhost:8093 (admin/admin)
+# Jupyter:    http://localhost:8888 (token: jupyter)
 # Spark UI:   http://localhost:8090
 # Flink UI:   http://localhost:8092
 # MinIO:      http://localhost:9001 (minioadmin/minioadmin123)
+# Marquez:    http://localhost:3001
+```
+
+### Quick Verification
+
+For detailed step-by-step instructions, see [QUICKSTART.md](QUICKSTART.md).
 # Marquez:    http://localhost:5050 (API), http://localhost:3001 (Web)
 # Jupyter:    http://localhost:8888 (token: jupyter)
 ```
@@ -264,8 +282,8 @@ curl "http://localhost:8080/romannumeral?query=42&apiKey=your-api-key"
                                     ▼
                         ┌───────────────────────┐
                         │    DATA PLATFORM      │
-                        │  (Flink → Iceberg →   │
-                        │   Spark → Superset)   │
+                        │  (Kafka → Spark →     │
+                        │   Iceberg → Jupyter)  │
                         └───────────────────────┘
 ```
 
@@ -305,14 +323,13 @@ curl "http://localhost:8080/romannumeral?query=42&apiKey=your-api-key"
 │   │        ▲                 ▲                 │                  │      │
 │   │        │                 │                 ▼                  │      │
 │   │   ┌────┴────┐      ┌────┴────┐     ┌─────────────┐           │      │
-│   │   │  Flink  │      │  Spark  │     │  Superset   │           │      │
-│   │   │(Ingest) │      │  (ETL)  │     │   (BI)      │           │      │
+│   │   │  Spark  │      │  Spark  │     │  Jupyter    │           │      │
+│   │   │(Bronze) │      │  (ETL)  │     │  (Analysis) │           │      │
 │   │   └─────────┘      └─────────┘     └─────────────┘           │      │
 │   └──────────────────────────────────────────────────────────────┘      │
 │                                                                          │
-│   Orchestration: Airflow    Quality: Great Expectations                  │
-│   Lineage: Marquez          Storage: MinIO (S3)                          │
-│   Catalog: Hive Metastore   Analysis: Jupyter                            │
+│   Orchestration: Airflow      Lineage: Marquez                           │
+│   Storage: MinIO (S3)         Catalog: Iceberg REST                      │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -408,8 +425,7 @@ See [data-platform/README.md](data-platform/README.md) for detailed documentatio
 | **Prometheus** | 9090 | http://localhost:9090 | - |
 | **PostgreSQL** | 5432 | - | romannumeral/romannumeral_secret |
 | **Kafka** | 9092/9094 | - | - |
-| **Airflow** | 8093 | http://localhost:8093 | airflow/airflow |
-| **Superset** | 8088 | http://localhost:8088 | admin/admin |
+| **Airflow** | 8093 | http://localhost:8093 | admin/admin |
 | **Spark Master** | 8090 | http://localhost:8090 | - |
 | **Flink** | 8092 | http://localhost:8092 | - |
 | **MinIO** | 9001 | http://localhost:9001 | minioadmin/minioadmin123 |
@@ -551,11 +567,10 @@ All architectural decisions documented in [`docs/adr/`](docs/adr/):
 | Apache Spark | 3.5 | Batch processing |
 | Apache Iceberg | 1.5 | Table format |
 | Apache Airflow | 2.8 | Orchestration |
-| Hive Metastore | 3.1 | Catalog |
+| Iceberg REST Catalog | 1.5 | Metadata catalog |
 | MinIO | Latest | Object storage |
-| Great Expectations | 0.18 | Data quality |
 | Marquez | 0.47 | Data lineage |
-| Apache Superset | 3.1 | BI dashboards |
+| Jupyter Lab | 4.0 | Data analysis |
 
 ---
 
@@ -587,8 +602,7 @@ roman-numeral-service/
 ├── docker/
 │   ├── grafana/
 │   ├── prometheus/
-│   ├── loki/
-│   └── superset/
+│   └── loki/
 ├── docs/
 │   ├── adr/              # Decision records
 │   └── API_SECURITY.md

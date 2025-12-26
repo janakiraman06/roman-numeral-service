@@ -1,5 +1,18 @@
 # Quick Start Cheatsheet
 
+## System Requirements
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **API Only** | 2 GB RAM, 1 GB disk | 4 GB RAM |
+| **Core Services** | 4 GB RAM, 5 GB disk | 8 GB RAM |
+| **Full Data Platform** | 8 GB RAM, 30 GB disk | 16 GB RAM, 40 GB disk |
+| **Docker Memory** | 6 GB | 10 GB |
+
+> **Note:** First `docker compose up` downloads ~15 GB of images. Allow 10-15 minutes.
+
+---
+
 ## 🚀 Running Locally
 
 ### Option 1: API Only (No Docker)
@@ -29,14 +42,14 @@ docker-compose ps
 # - Actuator:   http://localhost:8081/actuator
 ```
 
-### Option 3: Full Data Platform (All 21 Services)
+### Option 3: Full Data Platform (All 18 Services)
 
 ```bash
-# Start everything (first time takes 5-10 minutes for image pulls)
-docker-compose up -d
+# Start everything (first time takes 10-15 minutes for image pulls)
+docker compose up -d
 
-# Wait for all services to be healthy
-docker-compose ps
+# Wait for all services to be healthy (2-3 minutes)
+docker ps --format "table {{.Names}}\t{{.Status}}" | head -20
 
 # Core Services:
 # - API:        http://localhost:8080
@@ -45,14 +58,15 @@ docker-compose ps
 # - Prometheus: http://localhost:9090
 
 # Data Platform Services:
-# - Airflow:    http://localhost:8093 (airflow/airflow)
-# - Superset:   http://localhost:8088 (admin/admin)  
+# - Airflow:    http://localhost:8093 (admin/admin)
 # - Spark UI:   http://localhost:8090
 # - Flink UI:   http://localhost:8092
-# - MinIO:      http://localhost:9001 (minioadmin/minioadmin123)
-# - Marquez:    http://localhost:5050 (API), http://localhost:3001 (Web)
 # - Jupyter:    http://localhost:8888 (token: jupyter)
+# - MinIO:      http://localhost:9001 (minioadmin/minioadmin123)
+# - Marquez:    http://localhost:3001
 ```
+
+> **Important:** Airflow takes 2-3 minutes to fully initialize. If the UI shows errors, wait and refresh.
 
 ---
 
@@ -169,7 +183,6 @@ docker exec -it postgres psql -U romannumeral -d romannumeral
 # SQL queries
 SELECT * FROM app_user;
 SELECT * FROM api_key;
-SELECT * FROM conversion_request ORDER BY request_timestamp DESC LIMIT 10;
 ```
 
 ---
@@ -260,13 +273,46 @@ open http://localhost:9001
 ```bash
 # Open Airflow UI
 open http://localhost:8093
-# Login: airflow / airflow
+# Login: admin / admin
 
-# Trigger DAG manually
-docker exec airflow airflow dags trigger rns_silver_etl
+# Trigger DAGs in order:
+# 1. rns_bronze_ingestion - Kafka → Bronze layer
+# 2. rns_silver_etl - Bronze → Silver layer  
+# 3. rns_gold_etl - Silver → Gold layer
 
 # List DAGs
-docker exec airflow airflow dags list
+docker exec -u airflow airflow airflow dags list
+```
+
+### Manual ETL (Backfill / Immediate Verification)
+
+If scheduled DAGs show empty results (due to time interval filtering), run these commands for immediate data verification:
+
+```bash
+# Bronze ingestion (Kafka → Iceberg)
+docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
+  --master 'local[2]' \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
+  --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
+  /opt/spark-jobs/bronze_batch_backfill.py
+
+# Silver ETL with full date range
+docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
+  --master 'local[2]' \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
+  --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
+  /opt/spark-jobs/silver_etl.py \
+  --interval-start '2025-01-01T00:00:00' \
+  --interval-end '2025-12-31T00:00:00'
+
+# Gold ETL with full date range
+docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
+  --master 'local[2]' \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
+  --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
+  /opt/spark-jobs/gold_etl.py \
+  --interval-start '2025-01-01T00:00:00' \
+  --interval-end '2025-12-31T00:00:00'
 ```
 
 ### Spark
@@ -309,7 +355,35 @@ curl -s http://localhost:5050/api/v1/namespaces | jq .
 ```bash
 # Open Jupyter Lab
 open http://localhost:8888
-# Token: jupyter (or check docker-compose logs jupyter for the URL)
+# Token: jupyter
+
+# Navigate to work/02_lakehouse_analysis.ipynb for pre-built queries
+# Or create a new notebook with this code to verify data:
+```
+
+```python
+# Jupyter PySpark code to verify lakehouse data
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+    .config("spark.jars.packages", "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18") \
+    .config("spark.sql.catalog.lakehouse", "org.apache.iceberg.spark.SparkCatalog") \
+    .config("spark.sql.catalog.lakehouse.type", "rest") \
+    .config("spark.sql.catalog.lakehouse.uri", "http://iceberg-rest:8181") \
+    .config("spark.sql.catalog.lakehouse.warehouse", "s3://lakehouse/warehouse") \
+    .config("spark.sql.catalog.lakehouse.io-impl", "org.apache.iceberg.aws.s3.S3FileIO") \
+    .config("spark.sql.catalog.lakehouse.s3.endpoint", "http://minio:9000") \
+    .config("spark.sql.catalog.lakehouse.s3.access-key-id", "minioadmin") \
+    .config("spark.sql.catalog.lakehouse.s3.secret-access-key", "minioadmin123") \
+    .config("spark.sql.catalog.lakehouse.s3.path-style-access", "true") \
+    .config("spark.sql.catalog.lakehouse.client.region", "us-east-1") \
+    .config("spark.sql.defaultCatalog", "lakehouse") \
+    .getOrCreate()
+
+# Check all layers
+spark.sql("SELECT COUNT(*) as bronze_count FROM lakehouse.bronze.raw_conversion_events").show()
+spark.sql("SELECT COUNT(*) as silver_count FROM lakehouse.silver.fact_conversions").show()
+spark.sql("SELECT * FROM lakehouse.gold.popular_numbers ORDER BY request_count DESC LIMIT 10").show()
 ```
 
 ---
@@ -339,11 +413,7 @@ docker exec -it kafka kafka-console-consumer.sh \
 # 5. Check Grafana dashboards
 open http://localhost:3000/d/roman-numeral-service
 
-# 6. Check database
-docker exec -it postgres psql -U romannumeral -d romannumeral \
-  -c "SELECT COUNT(*) FROM conversion_request;"
-
-# 7. Open Jupyter for analysis
+# 6. Open Jupyter for lakehouse analysis
 open http://localhost:8888
 ```
 
@@ -413,8 +483,7 @@ docker exec -it kafka kafka-broker-api-versions.sh --bootstrap-server localhost:
 | Prometheus | 9090 | http://localhost:9090 | - |
 | Loki | 3100 | - | - |
 | **Data Platform** ||||
-| Airflow | 8093 | http://localhost:8093 | airflow / airflow |
-| Superset | 8088 | http://localhost:8088 | admin / admin |
+| Airflow | 8093 | http://localhost:8093 | admin / admin |
 | Spark Master | 8090 | http://localhost:8090 | - |
 | Spark Worker | 8091 | http://localhost:8091 | - |
 | Flink | 8092 | http://localhost:8092 | - |
@@ -430,10 +499,10 @@ docker exec -it kafka kafka-broker-api-versions.sh --bootstrap-server localhost:
 The following end-to-end flow has been tested:
 
 ```
-API Request → Spring Boot → Kafka (roman-numeral-events) → Verified ✅
+API Request → Spring Boot → Kafka → Spark (Bronze/Silver/Gold) → Iceberg → Jupyter ✅
 ```
 
-All 21 services start successfully with `docker-compose up -d`.
+All 18 services start successfully with `docker compose up -d`.
 
 ### Sample Kafka Event
 

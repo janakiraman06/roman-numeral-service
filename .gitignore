@@ -121,11 +121,16 @@ node_modules/
 # -----------------
 docs/ALGORITHM_STUDY.md
 docs/DEEP_DIVE_DISCUSSION.md
-docs/SESSION_CONTEXT.md
 docs/VTHREAD_METRICS_OBSERVATION.md
 docs/DATA_MODELING.md
 docs/DATA_STANDARDS.md
 TECH_DECISIONS.md
+
+# Session-specific / personal reference files
+SESSION_CONTEXT.md
+TROUBLESHOOTING_LOG.md
+REVIEWER_QUICKTEST.md
+docs/SESSION_CONTEXT.md
 
 
 # Flink build artifacts

@@ -105,7 +105,7 @@ We need a modern data architecture that supports both real-time streaming and ba
         │                           │                           │
         ▼                           ▼                           ▼
    ┌─────────┐              ┌─────────────┐            ┌─────────────┐
-   │  Kafka  │──────────────│    Spark    │────────────│  Superset   │
+   │  Kafka  │──────────────│    Spark    │────────────│   Jupyter   │
    └─────────┘              └─────────────┘            └─────────────┘
         │                           │                           │
         └───────────────────────────┼───────────────────────────┘
@@ -162,7 +162,7 @@ We chose **Option C: Unified Lakehouse Architecture** because:
 ### Catalog Layer
 | Component | Local | AWS | GCP | Azure |
 |-----------|-------|-----|-----|-------|
-| Metastore | Hive Metastore | Glue Catalog | BigQuery | Unity Catalog |
+| Metastore | Iceberg REST Catalog | Glue Catalog | BigQuery | Unity Catalog |
 
 ### Processing Layer
 | Component | Local | Cloud |
@@ -174,9 +174,8 @@ We chose **Option C: Unified Lakehouse Architecture** because:
 ### Serving Layer
 | Component | Purpose |
 |-----------|---------|
-| Superset | BI dashboards |
-| Jupyter | Ad-hoc analysis |
-| Trino (optional) | SQL queries |
+| Jupyter | Ad-hoc analysis & BI |
+| PySpark | SQL queries on Iceberg |
 
 ## Medallion Architecture
 

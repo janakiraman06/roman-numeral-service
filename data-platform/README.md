@@ -191,7 +191,7 @@ spark-submit \
 ### Gold Layer (Spark)
 - Star schema for BI
 - Pre-aggregated metrics
-- Optimized for Superset queries
+- Optimized for analytics queries
 - Daily refresh
 
 ## Monitoring

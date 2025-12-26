@@ -12,7 +12,7 @@
 app:
   rate-limiting:
     enabled: true
-    requests-per-minute: 1000  # Relaxed for load testing
+    requests-per-minute: 50000  # High limit for load testing (set lower in prod)
   
   api-security:
     enabled: false  # No API key required for local development

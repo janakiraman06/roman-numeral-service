@@ -20,25 +20,29 @@ import java.time.Duration;
 /**
  * Bronze Layer Streaming Ingestion Job.
  * 
- * <p>Reads conversion events from Kafka and writes to Iceberg Bronze layer
- * with exactly-once semantics, deduplication, and late arrival handling.</p>
- * 
- * <h3>Data Engineering Standards Implemented:</h3>
- * <ol>
- *   <li><b>Exactly-Once Semantics</b>: Flink checkpointing + Kafka offsets</li>
- *   <li><b>Late Arriving Data</b>: 5-minute watermark delay, 1-hour allowed lateness</li>
+ * <p>Demonstrates production-grade streaming patterns for Bronze layer ingestion:</p>
+ * <ul>
+ *   <li><b>Exactly-Once Semantics</b>: Flink checkpointing with Kafka offsets</li>
+ *   <li><b>Late Arriving Data</b>: 5-minute watermark delay, side output for late events</li>
  *   <li><b>Deduplication</b>: Keyed by event_id with 24-hour state TTL</li>
- *   <li><b>Error Handling</b>: Dead Letter Queue for malformed events</li>
- *   <li><b>Backfill Support</b>: Configurable Kafka start offset</li>
- *   <li><b>Failure Recovery</b>: Checkpoint-based state recovery</li>
- * </ol>
+ *   <li><b>Error Handling</b>: Null filtering for malformed events</li>
+ *   <li><b>Failure Recovery</b>: Externalized checkpoints for state recovery</li>
+ * </ul>
+ * 
+ * <h3>Architecture Note:</h3>
+ * <p>This job demonstrates real-time streaming capabilities. In production, the output
+ * would be written to Iceberg Bronze layer. For local demo, output is logged to console
+ * while Spark batch handles the actual Bronze table writes.</p>
  * 
  * <h3>Job Topology:</h3>
  * <pre>
- * Kafka Source
+ * Kafka Source (roman-numeral-events)
  *       │
  *       ▼
- * JSON Parsing (with DLQ for errors)
+ * JSON Parsing (ConversionEvent)
+ *       │
+ *       ▼
+ * Null/Invalid Filtering
  *       │
  *       ▼
  * Watermark Assignment (5-min delay)
@@ -52,13 +56,7 @@ import java.time.Duration;
  *       ├─────────────────┐
  *       ▼                 ▼
  * Main Output        Late Arrivals
- * (Bronze Sink)      (Side Output)
- * </pre>
- * 
- * <h3>Usage:</h3>
- * <pre>
- * flink run -c com.adobe.lakehouse.bronze.job.BronzeIngestionJob \
- *     bronze-ingestion-1.0.0.jar
+ * (Console/Iceberg)  (Side Output)
  * </pre>
  * 
  * @author Roman Numeral Service Data Platform
@@ -76,8 +74,6 @@ public class BronzeIngestionJob {
             "KAFKA_BOOTSTRAP_SERVERS", "kafka:9092");
     private static final String INPUT_TOPIC = getEnvOrDefault(
             "KAFKA_INPUT_TOPIC", "roman-numeral-events");
-    private static final String DLQ_TOPIC = getEnvOrDefault(
-            "KAFKA_DLQ_TOPIC", "roman-numeral-events-dlq");
     private static final String CONSUMER_GROUP = getEnvOrDefault(
             "KAFKA_CONSUMER_GROUP", "flink-bronze-ingestion");
     
@@ -96,9 +92,9 @@ public class BronzeIngestionJob {
         LOG.info("============================================================");
         LOG.info("Kafka Brokers: {}", KAFKA_BROKERS);
         LOG.info("Input Topic: {}", INPUT_TOPIC);
-        LOG.info("DLQ Topic: {}", DLQ_TOPIC);
         LOG.info("Consumer Group: {}", CONSUMER_GROUP);
         LOG.info("Watermark Delay: {}", WATERMARK_DELAY);
+        LOG.info("Checkpoint Interval: {}ms", CHECKPOINT_INTERVAL_MS);
         LOG.info("============================================================");
         
         // Create execution environment
@@ -167,8 +163,8 @@ public class BronzeIngestionJob {
                     try {
                         return ConversionEvent.fromJson(json);
                     } catch (Exception e) {
-                        LOG.error("Failed to parse JSON: {}. Sending to DLQ.", json, e);
-                        // Return null for invalid events (filtered out next)
+                        LOG.warn("Failed to parse JSON: {}. Error: {}", 
+                                json.substring(0, Math.min(100, json.length())), e.getMessage());
                         return null;
                     }
                 })
@@ -191,25 +187,29 @@ public class BronzeIngestionJob {
         DataStream<BronzeRecord> lateArrivals = deduplicatedStream
                 .getSideOutput(DeduplicationFunction.LATE_ARRIVALS_TAG);
         
-        // 8. Log late arrivals (in production, write to separate table)
+        // 8. Log late arrivals
         lateArrivals
                 .map(record -> {
-                    LOG.warn("Late arrival: {}", record);
+                    LOG.warn("Late arrival detected: eventId={}, timestamp={}", 
+                            record.getEventId(), record.getEventTimestamp());
                     return record;
                 })
                 .name("Late Arrival Logger");
         
-        // 9. Main output - write to Bronze layer
-        // In production, use Iceberg sink:
-        // deduplicatedStream.sinkTo(icebergSink).name("Iceberg Bronze Sink");
-        
-        // For demo, print to stdout
+        // 9. Main output - print to console for demo
+        // In production, this would write to Iceberg Bronze layer
         deduplicatedStream
-                .map(BronzeRecord::toString)
+                .map(record -> String.format("BRONZE_EVENT: id=%s, type=%s, input=%s, output=%s",
+                        record.getEventId(),
+                        record.getConversionType(),
+                        record.getInputValue(),
+                        record.getOutputValue()))
                 .print()
                 .name("Bronze Output (Demo)");
         
         LOG.info("Pipeline built successfully");
+        LOG.info("NOTE: In production, output would be written to Iceberg Bronze layer.");
+        LOG.info("      For demo, events are printed to console. Check TaskManager logs.");
     }
     
     /**
@@ -235,4 +235,3 @@ public class BronzeIngestionJob {
         return value != null && !value.isEmpty() ? value : defaultValue;
     }
 }
-

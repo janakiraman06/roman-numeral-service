@@ -44,8 +44,12 @@
     
     <property>
         <name>hive.metastore.warehouse.dir</name>
-        <value>s3a://lakehouse/warehouse</value>
-        <description>Default warehouse location in MinIO</description>
+        <value>/opt/hive/data/warehouse</value>
+        <description>
+            Local warehouse for metastore default database.
+            Actual Iceberg table data locations are managed separately by Spark/Flink
+            and stored in MinIO (s3a://lakehouse/warehouse/).
+        </description>
     </property>
 
     <!-- Schema Initialization -->
@@ -59,37 +63,6 @@
         <name>hive.metastore.schema.verification</name>
         <value>false</value>
         <description>Skip schema verification for development</description>
-    </property>
-
-    <!-- S3/MinIO Settings -->
-    <property>
-        <name>fs.s3a.endpoint</name>
-        <value>http://minio:9000</value>
-        <description>MinIO S3 endpoint</description>
-    </property>
-    
-    <property>
-        <name>fs.s3a.access.key</name>
-        <value>minioadmin</value>
-        <description>MinIO access key</description>
-    </property>
-    
-    <property>
-        <name>fs.s3a.secret.key</name>
-        <value>minioadmin123</value>
-        <description>MinIO secret key</description>
-    </property>
-    
-    <property>
-        <name>fs.s3a.path.style.access</name>
-        <value>true</value>
-        <description>Use path-style access for MinIO</description>
-    </property>
-    
-    <property>
-        <name>fs.s3a.impl</name>
-        <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
-        <description>S3A filesystem implementation</description>
     </property>
 
     <!-- Iceberg Support -->
