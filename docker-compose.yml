@@ -16,6 +16,7 @@
 # - Prometheus (Metrics collection)
 # - Loki + Promtail (Log aggregation)
 # - Grafana (Visualization)
+# - Marquez (Data lineage with OpenLineage)
 #
 # Note: Uses json-file logging driver (default) instead of
 # Loki plugin. Promtail scrapes logs from Docker log files.
@@ -521,6 +522,85 @@ services:
       - prometheus
       - loki
 
+  # ==========================================
+  # Marquez (Data Lineage with OpenLineage)
+  # ==========================================
+  # API: http://localhost:5000
+  # Web UI: http://localhost:3001
+  # OpenLineage endpoint: http://marquez:5000/api/v1/lineage
+  # ==========================================
+  
+  marquez:
+    image: marquezproject/marquez:0.47.0
+    container_name: marquez
+    ports:
+      - "5000:5000"   # API
+      - "5001:5001"   # Admin
+    environment:
+      # Database configuration
+      MARQUEZ_CONFIG: |
+        server:
+          applicationConnectors:
+            - type: http
+              port: 5000
+          adminConnectors:
+            - type: http
+              port: 5001
+        db:
+          driverClass: org.postgresql.Driver
+          url: jdbc:postgresql://marquez-db:5432/marquez
+          user: marquez
+          password: marquez_secret
+        logging:
+          level: INFO
+          appenders:
+            - type: console
+    depends_on:
+      marquez-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/namespaces"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - observability
+    labels:
+      logging: "promtail"
+
+  marquez-db:
+    image: postgres:16-alpine
+    container_name: marquez-db
+    environment:
+      POSTGRES_DB: marquez
+      POSTGRES_USER: marquez
+      POSTGRES_PASSWORD: marquez_secret
+    volumes:
+      - marquez_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marquez -d marquez"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability
+
+  marquez-web:
+    image: marquezproject/marquez-web:0.47.0
+    container_name: marquez-web
+    ports:
+      - "3001:3000"
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: 5000
+    depends_on:
+      marquez:
+        condition: service_healthy
+    networks:
+      - observability
+    labels:
+      logging: "promtail"
+
 # ==========================================
 # Networks
 # ==========================================
@@ -543,4 +623,5 @@ volumes:
   prometheus_data:
   loki_data:
   grafana_data:
+  marquez_db_data:
 

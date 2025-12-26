@@ -49,6 +49,7 @@ What becomes easier or more difficult because of this decision?
 | [ADR-012](012-unified-lakehouse-architecture.md) | Unified Lakehouse Architecture | Accepted | 2025-12-25 |
 | [ADR-013](013-processing-engine-selection.md) | Processing Engine Selection (Flink + Spark Hybrid) | Accepted | 2025-12-25 |
 | [ADR-014](014-data-quality-framework.md) | Data Quality Framework Selection (Great Expectations) | Accepted | 2025-12-25 |
+| [ADR-015](015-data-lineage.md) | Data Lineage with Marquez and OpenLineage | Accepted | 2025-12-25 |
 
 ## How to Add a New ADR
 
