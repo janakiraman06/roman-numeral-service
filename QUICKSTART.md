@@ -27,6 +27,8 @@ curl "http://localhost:8080/romannumeral?query=42"
 
 ### Option 2: Core Services Only (3 services, ~2 GB RAM)
 
+> **Note:** If you ran Option 1 (`./mvnw spring-boot:run`), stop it first with `Ctrl+C` - port 8080 would conflict.
+
 ```bash
 # Start core services (postgres, kafka, roman-numeral-service)
 docker compose up -d
