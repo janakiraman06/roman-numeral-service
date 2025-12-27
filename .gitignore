@@ -136,3 +136,7 @@ docs/SESSION_CONTEXT.md
 # Flink build artifacts
 data-platform/flink/bronze-ingestion/target/
 data-platform/flink/bronze-ingestion/dependency-reduced-pom.xml
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
