@@ -1,52 +1,62 @@
 # Data Platform
 
-This directory contains the data engineering components for the Roman Numeral Service's Unified Lakehouse Architecture using a **Flink + Spark Hybrid** approach.
+This directory contains the data engineering components for the Roman Numeral Service's Unified Lakehouse Architecture.
 
-## Architecture Overview
+> **See also:** [Main README](../README.md) | [Quick Start Guide](../QUICKSTART.md)
+
+## Current Data Flow (Working)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                     Hybrid Processing Architecture                          │
+│                     PRODUCTION DATA PIPELINE                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│   ┌──────────────────────────────────────────────────────────────────────┐ │
-│   │                    STREAMING (Apache Flink)                          │ │
-│   │                                                                      │ │
-│   │     Kafka  ────▶  Flink Job  ────▶  Bronze (Iceberg)                │ │
-│   │                   │                                                  │ │
-│   │                   ├─ Watermarks (5 min delay)                       │ │
-│   │                   ├─ Deduplication (event_id, 24hr TTL)             │ │
-│   │                   ├─ Late arrival handling (1 hr window)            │ │
-│   │                   ├─ Exactly-once (checkpoints + RocksDB)           │ │
-│   │                   └─ Dead Letter Queue (errors)                     │ │
-│   │                                                                      │ │
-│   │   Latency: Milliseconds | UI: http://localhost:8092                 │ │
-│   └──────────────────────────────────────────────────────────────────────┘ │
-│                                │                                            │
-│                                ▼                                            │
-│   ┌──────────────────────────────────────────────────────────────────────┐ │
-│   │                    BATCH (Apache Spark via Airflow)                  │ │
-│   │                                                                      │ │
-│   │     Bronze  ────▶  Spark  ────▶  Silver  ────▶  Spark  ────▶  Gold  │ │
-│   │                    │                           │                     │ │
-│   │                    ├─ SCD Type 2               ├─ Star Schema       │ │
-│   │                    ├─ Data validation          ├─ Aggregations      │ │
-│   │                    └─ MERGE INTO               └─ Materialized views│ │
-│   │                                                                      │ │
-│   │   Schedule: Hourly (Silver), Daily (Gold) | UI: http://localhost:8090│ │
-│   └──────────────────────────────────────────────────────────────────────┘ │
+│   API Request                                                               │
+│       │                                                                     │
+│       ▼                                                                     │
+│   ┌─────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐  │
+│   │  Kafka  │────▶│ Spark Bronze│────▶│ Spark Silver│────▶│ Spark Gold  │  │
+│   │ Events  │     │  Ingestion  │     │    ELT      │     │    ELT      │  │
+│   └─────────┘     └─────────────┘     └─────────────┘     └─────────────┘  │
+│                          │                   │                   │          │
+│                          ▼                   ▼                   ▼          │
+│                   ┌─────────────────────────────────────────────────────┐   │
+│                   │              ICEBERG LAKEHOUSE (MinIO)              │   │
+│                   │   bronze.raw_events → silver.fact/dim → gold.agg   │   │
+│                   └─────────────────────────────────────────────────────┘   │
+│                                              │                              │
+│                                              ▼                              │
+│                                      ┌─────────────┐                        │
+│                                      │   Jupyter   │                        │
+│                                      │  Analytics  │                        │
+│                                      └─────────────┘                        │
+│                                                                             │
+│   Orchestration: Airflow           Lineage: Marquez                         │
+│   Storage: MinIO (S3)              Catalog: Iceberg REST                    │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Why Flink + Spark Hybrid?
+## Flink (Streaming Demo)
 
-| Engine | Layer | Why |
-|--------|-------|-----|
-| **Flink** | Bronze | True event-at-a-time streaming, superior state management (RocksDB), first-class watermarks |
-| **Spark** | Silver/Gold | Mature SQL engine, excellent Iceberg support, proven batch performance |
+Flink is included as a **streaming capability demonstration** for future enhancement. The Flink job code is production-ready but is **not actively feeding Iceberg tables** in this demo.
 
-This pattern is used by **Uber**, **LinkedIn**, and other industry leaders. See [ADR-013](../docs/adr/013-processing-engine-selection.md) for detailed rationale.
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                    FLINK STREAMING (Future Enhancement)              │
+│                                                                      │
+│     Kafka  ────▶  Flink Job  ────▶  Console (demo) / Iceberg (prod) │
+│                   │                                                  │
+│                   ├─ Watermarks (5 min delay)                       │
+│                   ├─ Deduplication (event_id, 24hr TTL)             │
+│                   ├─ Late arrival handling (1 hr window)            │
+│                   └─ Exactly-once (checkpoints + RocksDB)           │
+│                                                                      │
+│   Status: Demo only | UI: http://localhost:8092                     │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+To enable Flink → Iceberg in production, see [ADR-013](../docs/adr/013-processing-engine-selection.md).
 
 ---
 
@@ -234,14 +244,14 @@ spark-submit \
 
 | Layer | Engine | Purpose | Update Frequency |
 |-------|--------|---------|------------------|
-| **Bronze** | Flink | Raw event landing | Real-time (streaming) |
-| **Silver** | Spark | Cleaned, validated, SCD Type 2 | Hourly (batch) |
-| **Gold** | Spark | Star schema, aggregates | Daily (batch) |
+| **Bronze** | Spark (batch) | Raw event landing from Kafka | On-demand / Scheduled |
+| **Silver** | Spark (batch) | Cleaned, validated, SCD Type 2 | Hourly |
+| **Gold** | Spark (batch) | Star schema, aggregates | Daily |
 
-### Bronze Layer (Flink)
-- Append-only raw events from Kafka
-- Partitioned by year/month/day
-- Late arrivals flagged
+### Bronze Layer (Spark)
+- Batch ingestion from Kafka topic
+- Append-only raw events
+- Partitioned by event date
 - No transformations
 
 ### Silver Layer (Spark)
@@ -255,6 +265,79 @@ spark-submit \
 - Pre-aggregated metrics
 - Optimized for analytics queries
 - Daily refresh
+
+## Testing the Data Platform
+
+### Step 1: Generate Test Data
+
+```bash
+# Generate 100 API requests to create Kafka events
+for i in {1..100}; do
+  curl -s "http://localhost:8080/romannumeral?query=$((RANDOM % 3999 + 1))" > /dev/null
+done
+echo "Generated 100 events"
+
+# Verify events in Kafka
+docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic roman-numeral-events \
+  --from-beginning --max-messages 5
+```
+
+### Step 2: Test Airflow Pipelines
+
+1. **Open Airflow UI**: http://localhost:8093 (admin/admin)
+2. **Enable all DAGs** (toggle switches to ON):
+   - `rns_bronze_ingestion` - Kafka → Bronze
+   - `rns_silver_elt` - Bronze → Silver
+   - `rns_gold_elt` - Silver → Gold
+3. **Trigger DAGs in order** (click play button):
+   - First: `rns_bronze_ingestion`
+   - Wait for completion (green), then: `rns_silver_elt`
+   - Wait for completion (green), then: `rns_gold_elt`
+
+Or trigger via CLI:
+```bash
+docker exec -u airflow airflow airflow dags trigger rns_bronze_ingestion
+# Wait 1-2 minutes
+docker exec -u airflow airflow airflow dags trigger rns_silver_elt
+# Wait 1-2 minutes
+docker exec -u airflow airflow airflow dags trigger rns_gold_elt
+```
+
+### Step 3: Verify Data in Jupyter
+
+1. **Open Jupyter**: http://localhost:8888 (token: `jupyter`)
+2. **Navigate to**: `work/02_lakehouse_analysis.ipynb`
+3. **Run all cells** - you should see:
+   - Bronze layer: `raw_conversion_events` with row count
+   - Silver layer: `fact_conversions`, `dim_users`
+   - Gold layer: `popular_numbers`, `daily_conversion_summary`, `user_metrics`
+
+### Step 4: View Data Lineage in Marquez
+
+1. **Open Marquez UI**: http://localhost:3001
+2. **Select namespace**: `rns-data-platform`
+3. **View lineage graph**: Click on any job (e.g., `gold-elt`) to see full lineage
+
+### Quick Verification Commands
+
+```bash
+# Check Airflow DAG status
+docker exec -u airflow airflow airflow dags list
+
+# Check Bronze table row count (via Spark)
+docker exec spark-master spark-sql \
+  --conf spark.sql.catalog.lakehouse=org.apache.iceberg.spark.SparkCatalog \
+  --conf spark.sql.catalog.lakehouse.type=rest \
+  --conf spark.sql.catalog.lakehouse.uri=http://iceberg-rest:8181 \
+  -e "SELECT COUNT(*) FROM lakehouse.bronze.raw_conversion_events"
+
+# Check Marquez datasets
+curl -s http://localhost:5050/api/v1/namespaces/rns-data-platform/datasets | jq '.datasets[].name'
+```
+
+---
 
 ## Data Lineage (Marquez)
 
@@ -270,6 +353,8 @@ spark-submit \
 ### Viewing Lineage
 - **Marquez UI**: http://localhost:3001
 - **Namespace**: `rns-data-platform`
+
+---
 
 ## Monitoring
 

@@ -120,8 +120,8 @@ curl -H "X-API-Key: rns_demo1234_testkeyforlocaldev" \
 curl -H "Authorization: Bearer rns_demo1234_testkeyforlocaldev" \
      "http://localhost:8080/romannumeral?query=42"
 
-# With query param
-curl "http://localhost:8080/romannumeral?query=42&apiKey=rns_demo1234_testkeyforlocaldev"
+# With query param (not recommended)
+curl "http://localhost:8080/romannumeral?query=42&api_key=rns_demo1234_testkeyforlocaldev"
 ```
 
 ### 3. Bulk Testing
@@ -236,6 +236,8 @@ docker compose logs -f --tail=100 -t
 ---
 
 ## 🗄️ Data Platform
+
+> **See also:** [Data Platform README](data-platform/README.md) for detailed architecture and testing instructions.
 
 ### Kafka
 
