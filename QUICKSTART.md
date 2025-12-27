@@ -287,6 +287,7 @@ open http://localhost:9001
 open http://localhost:8093
 # Login: admin / admin
 
+# DAGs are PAUSED by default - enable them first (toggle switches to ON)
 # Trigger DAGs in order:
 # 1. rns_bronze_ingestion - Kafka → Bronze layer
 # 2. rns_silver_elt - Bronze → Silver layer  
@@ -295,6 +296,8 @@ open http://localhost:8093
 # List DAGs
 docker exec -u airflow airflow airflow dags list
 ```
+
+> **Note:** First DAG run may fail due to Maven JAR downloads. Just clear and retry - subsequent runs use cached JARs.
 
 ### Manual ETL (Backfill / Immediate Verification)
 

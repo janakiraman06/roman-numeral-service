@@ -287,7 +287,7 @@ docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
 ### Step 2: Test Airflow Pipelines
 
 1. **Open Airflow UI**: http://localhost:8093 (admin/admin)
-2. **Enable all DAGs** (toggle switches to ON):
+2. **Enable all DAGs** (toggle switches to ON - DAGs start paused by default):
    - `rns_bronze_ingestion` - Kafka → Bronze
    - `rns_silver_elt` - Bronze → Silver
    - `rns_gold_elt` - Silver → Gold
@@ -295,6 +295,10 @@ docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
    - First: `rns_bronze_ingestion`
    - Wait for completion (green), then: `rns_silver_elt`
    - Wait for completion (green), then: `rns_gold_elt`
+
+> **Note:** The first DAG run may fail due to Maven JAR downloads (Iceberg, AWS SDK).
+> This is a transient network issue. Simply **clear and retry** the failed task - 
+> subsequent runs will use cached JARs.
 
 Or trigger via CLI:
 ```bash
