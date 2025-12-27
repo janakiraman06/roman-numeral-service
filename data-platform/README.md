@@ -321,8 +321,9 @@ docker exec -u airflow airflow airflow dags trigger rns_gold_elt
 ### Step 4: View Data Lineage in Marquez
 
 1. **Open Marquez UI**: http://localhost:3001
-2. **Select namespace**: `rns-data-platform`
-3. **View lineage graph**: Click on any job (e.g., `gold-elt`) to see full lineage
+2. **View Jobs**: Select namespace `rns-data-platform` → See `bronze-ingestion`, `silver-elt`, `gold-elt`
+3. **View Datasets**: Switch to namespace `iceberg` (tables) or `kafka` (topics)
+4. **View Lineage Graph**: Click on any job (e.g., `gold-elt`) to see how datasets connect
 
 ### Quick Verification Commands
 
@@ -356,7 +357,10 @@ curl -s http://localhost:5050/api/v1/namespaces/rns-data-platform/datasets | jq 
 
 ### Viewing Lineage
 - **Marquez UI**: http://localhost:3001
-- **Namespace**: `rns-data-platform`
+- **Namespaces**:
+  - `rns-data-platform` - Jobs (bronze-ingestion, silver-elt, gold-elt)
+  - `iceberg` - Iceberg table datasets
+  - `kafka` - Kafka topic datasets
 
 ---
 
