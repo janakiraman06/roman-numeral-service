@@ -48,6 +48,64 @@ This directory contains the data engineering components for the Roman Numeral Se
 
 This pattern is used by **Uber**, **LinkedIn**, and other industry leaders. See [ADR-013](../docs/adr/013-processing-engine-selection.md) for detailed rationale.
 
+---
+
+## Screenshots
+
+### Airflow - DAG List
+
+All pipelines enabled and ready:
+
+![Airflow DAGs](docs/airflow-dags.png)
+
+### Airflow - DAG Graph View
+
+Task dependencies visualization:
+
+![Airflow DAG Graph](docs/airflow-dag-graph.png)
+
+### Airflow - Successful Runs
+
+Pipeline execution history:
+
+![Airflow Runs](docs/airflow-runs.png)
+
+### Marquez - Data Lineage
+
+End-to-end data flow from Bronze → Silver → Gold:
+
+![Marquez Lineage](docs/marquez-lineage.png)
+
+### Marquez - Datasets
+
+Tracked datasets in the lakehouse:
+
+![Marquez Datasets](docs/marquez-datasets.png)
+
+### Jupyter - Data Exploration (Notebook 01)
+
+PostgreSQL exploration and API keys analysis:
+
+![Jupyter Results 1](docs/jupyter-results-1.png)
+
+### Jupyter - Lakehouse Analysis (Notebook 02)
+
+**Bronze/Silver/Gold Layer Counts:**
+
+![Jupyter Results 2-1](docs/jupyter-results-2_1.png)
+
+**Sample Data Preview:**
+
+![Jupyter Results 2-2](docs/jupyter-results-2_2.png)
+
+**Gold Layer Analytics:**
+
+![Jupyter Results 2-3](docs/jupyter-results-2_3.png)
+
+![Jupyter Gold Analytics](docs/jupyter-results-2_3_analytics_gold_layer.png)
+
+---
+
 ## Directory Structure
 
 ```

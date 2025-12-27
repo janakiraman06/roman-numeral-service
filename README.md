@@ -419,6 +419,20 @@ See [Quick Start](#quick-start) for profile commands, or [QUICKSTART.md](QUICKST
 | 📬 Kafka Metrics | Message rates |
 | 📋 Logs | Live application logs |
 
+### Screenshots
+
+**Grafana Dashboard - Overview:**
+
+![Grafana Dashboard 1](data-platform/docs/grafana-dashboard-1.png)
+
+**Grafana Dashboard - JVM & Kafka Metrics:**
+
+![Grafana Dashboard 2](data-platform/docs/grafana-dashboard-2.png)
+
+**Swagger API Documentation:**
+
+![Swagger UI](data-platform/docs/swagger-ui.png)
+
 ### Metrics Endpoints
 
 ```bash
