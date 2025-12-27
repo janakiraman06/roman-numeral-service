@@ -190,8 +190,8 @@ curl -H "X-API-Key: your-api-key" "http://localhost:8080/romannumeral?query=42"
 # Bearer token
 curl -H "Authorization: Bearer your-api-key" "http://localhost:8080/romannumeral?query=42"
 
-# Query parameter
-curl "http://localhost:8080/romannumeral?query=42&apiKey=your-api-key"
+# Query parameter (not recommended)
+curl "http://localhost:8080/romannumeral?query=42&api_key=your-api-key"
 ```
 
 **Dev profile**: API keys are disabled for local development.
