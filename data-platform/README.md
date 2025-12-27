@@ -300,6 +300,9 @@ docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
 > This is a transient network issue. Simply **clear and retry** the failed task - 
 > subsequent runs will use cached JARs.
 
+> **Important:** DAGs use time-interval filtering. For immediate testing, use the 
+> **Manual Backfill** commands below instead of triggering DAGs.
+
 Or trigger via CLI:
 ```bash
 docker exec -u airflow airflow airflow dags trigger rns_bronze_ingestion
@@ -307,6 +310,37 @@ docker exec -u airflow airflow airflow dags trigger rns_bronze_ingestion
 docker exec -u airflow airflow airflow dags trigger rns_silver_elt
 # Wait 1-2 minutes
 docker exec -u airflow airflow airflow dags trigger rns_gold_elt
+```
+
+### Manual Backfill (Recommended for Testing)
+
+DAG triggers use narrow time intervals. For immediate data verification, run these commands with wide date ranges:
+
+```bash
+# Bronze: Ingest ALL Kafka messages
+docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
+  --master 'local[2]' \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
+  --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
+  /opt/spark-jobs/bronze_batch_backfill.py
+
+# Silver: Process ALL bronze data
+docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
+  --master 'local[2]' \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
+  --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
+  /opt/spark-jobs/silver_elt.py \
+  --interval-start '2020-01-01T00:00:00' \
+  --interval-end '2030-12-31T00:00:00'
+
+# Gold: Aggregate ALL silver data
+docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
+  --master 'local[2]' \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
+  --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
+  /opt/spark-jobs/gold_elt.py \
+  --interval-start '2020-01-01T00:00:00' \
+  --interval-end '2030-12-31T00:00:00'
 ```
 
 ### Step 3: Verify Data in Jupyter
