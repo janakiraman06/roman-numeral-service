@@ -378,6 +378,64 @@ curl -s http://localhost:5050/api/v1/namespaces/rns-data-platform/datasets | jq 
 
 ---
 
+## Iceberg Time Travel
+
+Iceberg tables maintain **snapshots** of data, enabling queries against historical states.
+
+### Creating Multiple Snapshots
+
+Each Gold ELT run creates new snapshots. To test time travel:
+
+```bash
+# 1. Generate more API traffic
+for i in {1..50}; do curl -s "http://localhost:8080/romannumeral?query=$i" > /dev/null; done
+
+# 2. Run Gold ELT again (creates new snapshot)
+docker exec -e AWS_REGION=us-east-1 spark-master /opt/spark/bin/spark-submit \
+  --master 'local[2]' \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,software.amazon.awssdk:bundle:2.20.18,software.amazon.awssdk:url-connection-client:2.20.18 \
+  --conf "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp -Divy.home=/tmp" \
+  /opt/spark-jobs/gold_elt.py --interval-start '2020-01-01T00:00:00' --interval-end '2030-12-31T00:00:00'
+```
+
+### Time Travel Queries (in Jupyter)
+
+```python
+# View all snapshots
+spark.sql("""
+    SELECT snapshot_id, committed_at, operation 
+    FROM lakehouse.gold.popular_numbers.snapshots
+""").show(truncate=False)
+
+# Query a specific snapshot by ID
+spark.sql("""
+    SELECT COUNT(*) as count 
+    FROM lakehouse.gold.popular_numbers 
+    VERSION AS OF <snapshot_id>
+""").show()
+
+# Query by timestamp
+spark.sql("""
+    SELECT * FROM lakehouse.gold.popular_numbers 
+    TIMESTAMP AS OF '2025-12-27 06:00:00'
+""").show()
+```
+
+### Other Iceberg Metadata Queries
+
+```python
+# View table history
+spark.sql("SELECT * FROM lakehouse.gold.popular_numbers.history").show()
+
+# View data files
+spark.sql("SELECT * FROM lakehouse.gold.popular_numbers.files").show()
+
+# View table metadata
+spark.sql("SELECT * FROM lakehouse.gold.popular_numbers.metadata_log_entries").show()
+```
+
+---
+
 ## Data Lineage (Marquez)
 
 **Demo:** Lineage is seeded via `docker/marquez/init-lineage.sh` on startup.
